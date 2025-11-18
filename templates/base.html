@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html class="light" lang="en">
+<head>
+    <meta charset="utf-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <title>{% block title %}Lab Inventory System{% endblock %}</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&amp;display=swap" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet"/>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#0d7ff2",
+                        "background-light": "#f5f7f8",
+                    },
+                    fontFamily: {
+                        "display": ["Inter", "sans-serif"]
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                },
+            },
+        }
+    </script>
+    <style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        
+        /* Fixed sidebar for desktop */
+        .desktop-sidebar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 100vh;
+            width: 16rem; /* w-64 */
+            z-index: 30;
+            transition: transform 0.3s ease-in-out;
+        }
+        
+        /* Mobile sidebar overlay */
+        .sidebar-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 40;
+        }
+        
+        .sidebar-overlay.active {
+            display: block;
+        }
+        
+        /* Mobile sidebar */
+        .mobile-sidebar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 100vh;
+            width: 16rem;
+            z-index: 50;
+            transform: translateX(-100%);
+            transition: transform 0.3s ease-in-out;
+        }
+        
+        .mobile-sidebar.active {
+            transform: translateX(0);
+        }
+        
+        /* Main content area */
+        .main-content {
+            margin-left: 0;
+            transition: margin-left 0.3s ease-in-out;
+        }
+        
+        @media (min-width: 1024px) {
+            .main-content {
+                margin-left: 16rem; /* w-64 */
+            }
+        }
+        
+        /* Ensure proper scrolling */
+        html, body {
+            height: 100%;
+            overflow-x: hidden;
+        }
+
+        /* Better mobile modal support */
+        @media (max-width: 640px) {
+            .modal-mobile {
+                width: 95%;
+                margin: 0 auto;
+            }
+        }
+    </style>
+</head>
+<body class="font-display bg-background-light">
+    {% if session.user_id %}
+    <!-- Mobile Header -->
+    <div class="lg:hidden fixed top-0 left-0 right-0 bg-white border-b border-slate-200 z-30">
+        <div class="flex items-center justify-between p-4">
+            <div class="flex items-center gap-3">
+                <button onclick="toggleMobileSidebar()" class="p-2 rounded-lg hover:bg-slate-100">
+                    <span class="material-symbols-outlined text-slate-600">menu</span>
+                </button>
+                <span class="text-lg font-bold text-slate-800">SN LabTrack</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sidebar Overlay for Mobile -->
+    <div class="sidebar-overlay lg:hidden" id="sidebarOverlay" onclick="toggleMobileSidebar()"></div>
+
+    <!-- Desktop Sidebar (Fixed) -->
+    <div class="desktop-sidebar hidden lg:block">
+        {% include 'sidebar.html' %}
+    </div>
+
+    <!-- Mobile Sidebar -->
+    <div class="mobile-sidebar lg:hidden">
+        {% include 'sidebar.html' %}
+    </div>
+    
+    <!-- Main Content (Scrollable) -->
+    <main class="main-content min-h-screen p-4 lg:p-8 mt-16 lg:mt-0 overflow-y-auto">
+        {% block content %}{% endblock %}
+    </main>
+    {% else %}
+        {% block content_no_sidebar %}{% endblock %}
+    {% endif %}
+    
+    <script>
+        // Password visibility toggle
+        function togglePassword() {
+            const passwordInput = document.getElementById('password');
+            const toggleIcon = document.querySelector('.password-toggle');
+            if (passwordInput.type === 'password') {
+                passwordInput.type = 'text';
+                toggleIcon.textContent = 'visibility';
+            } else {
+                passwordInput.type = 'password';
+                toggleIcon.textContent = 'visibility_off';
+            }
+        }
+
+        // Mobile sidebar toggle
+        function toggleMobileSidebar() {
+            const sidebar = document.querySelector('.mobile-sidebar');
+            const overlay = document.getElementById('sidebarOverlay');
+            sidebar.classList.toggle('active');
+            overlay.classList.toggle('active');
+            
+            // Prevent body scroll when sidebar is open
+            if (sidebar.classList.contains('active')) {
+                document.body.style.overflow = 'hidden';
+            } else {
+                document.body.style.overflow = 'auto';
+            }
+        }
+
+        // Close mobile sidebar when clicking on a link
+        function closeMobileSidebar() {
+            const sidebar = document.querySelector('.mobile-sidebar');
+            const overlay = document.getElementById('sidebarOverlay');
+            if (window.innerWidth < 1024) {
+                sidebar.classList.remove('active');
+                overlay.classList.remove('active');
+                document.body.style.overflow = 'auto';
+            }
+        }
+
+        // Flash message auto-hide
+        document.addEventListener('DOMContentLoaded', function() {
+            const flashMessages = document.querySelectorAll('.flash-message');
+            flashMessages.forEach(message => {
+                setTimeout(() => {
+                    message.style.opacity = '0';
+                    setTimeout(() => message.remove(), 300);
+                }, 5000);
+            });
+
+            // Close sidebar when clicking on links (mobile)
+            document.querySelectorAll('a').forEach(link => {
+                link.addEventListener('click', closeMobileSidebar);
+            });
+        });
+
+        // Handle window resize
+        window.addEventListener('resize', function() {
+            if (window.innerWidth >= 1024) {
+                closeMobileSidebar();
+            }
+        });
+
+        // Better touch support for mobile dropdowns
+        document.addEventListener('touchstart', function(e) {
+            // Close dropdowns when tapping outside on mobile
+            const dropdowns = document.querySelectorAll('[id$="Dropdown"]');
+            dropdowns.forEach(dropdown => {
+                if (!dropdown.contains(e.target) && !dropdown.classList.contains('hidden')) {
+                    dropdown.classList.add('hidden');
+                    document.body.style.overflow = 'auto';
+                }
+            });
+        });
+    </script>
+</body>
+</html>

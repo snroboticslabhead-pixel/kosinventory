@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+
+{% block title %}Overdue Items - Lab Inventory System{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto">
+    <!-- Page Header -->
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 lg:mb-8">
+        <div class="flex flex-col">
+            <h1 class="text-2xl lg:text-3xl font-bold leading-tight tracking-tight text-slate-800">Overdue Items</h1>
+            <p class="text-sm lg:text-base font-normal leading-normal text-slate-500">Monitor and manage components that are overdue for return.</p>
+        </div>
+        <div class="flex items-center gap-2 w-full sm:w-auto">
+            <button class="flex w-full sm:w-auto cursor-pointer items-center justify-center overflow-hidden rounded-lg h-10 px-4 bg-red-600 text-white text-sm font-medium leading-normal gap-2 hover:bg-red-700">
+                <span class="material-symbols-outlined text-lg">send</span>
+                <span class="truncate">Send Reminders</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Overdue Stats -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div class="bg-white rounded-xl border border-slate-200 p-6">
+            <div class="flex items-center gap-4">
+                <div class="flex h-12 w-12 items-center justify-center rounded-full bg-red-100">
+                    <span class="material-symbols-outlined text-red-600">warning</span>
+                </div>
+                <div>
+                    <p class="text-sm font-medium text-slate-600">Total Overdue Items</p>
+                    <p class="text-2xl font-bold text-red-600">{{ total_overdue }}</p>
+                </div>
+            </div>
+        </div>
+        <div class="bg-white rounded-xl border border-slate-200 p-6">
+            <div class="flex items-center gap-4">
+                <div class="flex h-12 w-12 items-center justify-center rounded-full bg-orange-100">
+                    <span class="material-symbols-outlined text-orange-600">schedule</span>
+                </div>
+                <div>
+                    <p class="text-sm font-medium text-slate-600">Avg. Overdue Days</p>
+                    <p class="text-2xl font-bold text-orange-600">16</p>
+                </div>
+            </div>
+        </div>
+        <div class="bg-white rounded-xl border border-slate-200 p-6">
+            <div class="flex items-center gap-4">
+                <div class="flex h-12 w-12 items-center justify-center rounded-full bg-blue-100">
+                    <span class="material-symbols-outlined text-blue-600">person</span>
+                </div>
+                <div>
+                    <p class="text-sm font-medium text-slate-600">Users with Overdue</p>
+                    <p class="text-2xl font-bold text-blue-600">
+                        {{ overdue_items|map(attribute='issued_to')|unique|list|length }}
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Overdue Items Table -->
+    <div class="bg-white rounded-xl border border-slate-200 overflow-hidden">
+        <div class="p-6 border-b border-slate-200">
+            <h2 class="text-lg font-semibold text-slate-800">Overdue Components</h2>
+        </div>
+        
+        {% if overdue_items %}
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm text-left">
+                <thead class="text-xs text-slate-500 uppercase bg-slate-50">
+                    <tr>
+                        <th class="px-6 py-3">Component</th>
+                        <th class="px-6 py-3">Lab</th>
+                        <th class="px-6 py-3">Issued To</th>
+                        <th class="px-6 py-3 text-center">Qty Issued</th>
+                        <th class="px-6 py-3 text-center">Qty Returned</th>
+                        <th class="px-6 py-3">Issue Date</th>
+                        <th class="px-6 py-3">Days Overdue</th>
+                        <th class="px-6 py-3 text-center">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in overdue_items %}
+                    {% set days_overdue = (now - item.issue_date).days - 14 %}
+                    <tr class="border-b border-slate-200 hover:bg-red-50/50">
+                        <td class="px-6 py-4 font-medium text-slate-800">{{ item.component_name }}</td>
+                        <td class="px-6 py-4 text-slate-600">{{ item.lab }}</td>
+                        <td class="px-6 py-4 text-slate-600">{{ item.issued_to }}</td>
+                        <td class="px-6 py-4 text-center text-slate-600">{{ item.quantity_issued }}</td>
+                        <td class="px-6 py-4 text-center text-slate-600">{{ item.quantity_returned }}</td>
+                        <td class="px-6 py-4 text-slate-600">
+                            {{ item.issue_date.strftime('%Y-%m-%d') }}
+                        </td>
+                        <td class="px-6 py-4">
+                            <span class="inline-flex items-center rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-800">
+                                {{ days_overdue }} days
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 text-center">
+                            <div class="flex justify-center gap-2">
+                                <button class="p-1.5 rounded-md hover:bg-slate-100 text-slate-500 hover:text-primary">
+                                    <span class="material-symbols-outlined text-xl">mail</span>
+                                </button>
+                                <button class="p-1.5 rounded-md hover:bg-slate-100 text-slate-500 hover:text-green-600">
+                                    <span class="material-symbols-outlined text-xl">check</span>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center py-12">
+            <div class="mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
+                <span class="material-symbols-outlined text-green-600 text-2xl">check_circle</span>
+            </div>
+            <h3 class="text-lg font-medium text-slate-900 mb-2">No Overdue Items</h3>
+            <p class="text-slate-500">All components have been returned on time. Great job!</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

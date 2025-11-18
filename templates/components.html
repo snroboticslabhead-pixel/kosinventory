@@ -1,0 +1,1219 @@
+{% extends "base.html" %}
+
+{% block title %}{% if current_group %}{{ current_group.name }} - {% endif %}Component Management Dashboard{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto">
+    <!-- Flash Messages -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="flash-message mb-4 lg:mb-6 p-4 rounded-lg {% if category == 'error' %}bg-red-100 text-red-700{% else %}bg-green-100 text-green-700{% endif %}">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 lg:mb-8">
+        <div class="flex flex-col">
+            <h1 class="text-2xl lg:text-3xl font-bold leading-tight tracking-tight text-slate-800">
+                {% if current_group %}
+                <div class="flex items-center gap-3">
+                    <div class="w-3 h-3 rounded-full" style="background-color: {{ current_group.color }}"></div>
+                    {{ current_group.name }} Components
+                </div>
+                <p class="text-sm lg:text-base font-normal leading-normal text-slate-500 mt-1">
+                    {{ current_group.description }}
+                </p>
+                {% else %}
+                Components
+                <p class="text-sm lg:text-base font-normal leading-normal text-slate-500">Manage your component inventory.</p>
+                {% endif %}
+            </h1>
+        </div>
+        <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
+            {% if current_group %}
+            <a href="{{ url_for('components') }}" class="flex-1 sm:flex-none flex min-w-[84px] cursor-pointer items-center justify-center overflow-hidden rounded-lg h-10 px-4 bg-white text-slate-800 text-sm font-medium leading-normal tracking-[0.015em] gap-2 border border-slate-200 hover:bg-slate-50">
+                <span class="material-symbols-outlined text-lg">arrow_back</span>
+                <span class="truncate">All Components</span>
+            </a>
+            {% endif %}
+            <div class="flex gap-2">
+                <div class="relative flex-1">
+                    <button onclick="toggleImportDropdown()" class="flex w-full cursor-pointer items-center justify-center overflow-hidden rounded-lg h-10 px-4 bg-white text-slate-800 text-sm font-medium leading-normal tracking-[0.015em] gap-2 border border-slate-200 hover:bg-slate-50">
+                        <span class="material-symbols-outlined text-lg">upload</span>
+                        <span class="truncate hidden sm:inline">Import</span>
+                    </button>
+                    <div id="importDropdown" class="hidden absolute right-0 z-50 mt-2 w-80 sm:w-96 bg-white rounded-lg shadow-lg border border-slate-200 p-4">
+                        <div class="mb-4">
+                            <h3 class="text-sm font-medium text-slate-800 mb-2">Import Components</h3>
+                            <p class="text-xs text-slate-600 mb-3">Upload a CSV or Excel file to import components in bulk.</p>
+                            
+                            <div class="mb-3">
+                                <label class="block text-xs font-medium text-slate-700 mb-1">Select File</label>
+                                <input type="file" id="importFile" accept=".csv,.xlsx,.xls" class="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-white hover:file:bg-primary/90">
+                            </div>
+                            
+                            <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-3">
+                                <h4 class="text-xs font-medium text-blue-800 mb-1">Required Columns:</h4>
+                                <ul class="text-xs text-blue-700 list-disc pl-4 space-y-1">
+                                    <li><code>name</code> - Component name</li>
+                                    <li><code>category</code> - Component category</li>
+                                    <li><code>lab</code> - Lab name</li>
+                                    <li><code>group</code> - Component group (optional)</li>
+                                    <li><code>initial_quantity</code> - Initial stock quantity</li>
+                                    <li><code>current_quantity</code> - Current stock quantity</li>
+                                    <li><code>uid</code> - Component UID (optional, auto-generated if not provided)</li>
+                                </ul>
+                            </div>
+
+                            <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-3">
+                                <h4 class="text-xs font-medium text-yellow-800 mb-1">File Format:</h4>
+                                <p class="text-xs text-yellow-700">Supported formats: CSV, XLSX, XLS</p>
+                                <p class="text-xs text-yellow-700 mt-1">Download template: 
+                                    <a href="#" onclick="downloadTemplate()" class="text-primary hover:underline">components_template.csv</a>
+                                </p>
+                            </div>
+                            
+                            <div class="flex justify-between">
+                                <button onclick="toggleImportDropdown()" class="px-3 py-1.5 text-sm text-slate-600 hover:text-slate-800">Cancel</button>
+                                <button onclick="importComponents()" class="px-3 py-1.5 bg-primary text-white text-sm rounded hover:bg-primary/90">Import</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <a href="{{ url_for('export_components') }}" class="flex-1 sm:flex-none flex min-w-[84px] cursor-pointer items-center justify-center overflow-hidden rounded-lg h-10 px-4 bg-white text-slate-800 text-sm font-medium leading-normal tracking-[0.015em] gap-2 border border-slate-200 hover:bg-slate-50">
+                    <span class="material-symbols-outlined text-lg">download</span>
+                    <span class="truncate hidden sm:inline">Export</span>
+                </a>
+                <button onclick="openComponentModal()" class="flex-1 sm:flex-none flex max-w-[480px] cursor-pointer items-center justify-center overflow-hidden rounded-lg h-10 bg-primary text-white gap-2 text-sm font-medium leading-normal tracking-[0.015em] min-w-0 px-4">
+                    <span class="material-symbols-outlined text-lg">add</span>
+                    <span class="truncate">Add</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Import Results Modal -->
+    <div id="importResultsModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 hidden">
+        <div class="w-full max-w-md sm:max-w-lg rounded-xl bg-white shadow-xl max-h-[90vh] overflow-y-auto">
+            <div class="flex items-center justify-between border-b border-slate-200 p-4 sm:p-6 sticky top-0 bg-white">
+                <h3 class="text-xl font-bold text-slate-900">Import Results</h3>
+                <button onclick="closeImportResultsModal()" class="text-slate-500 hover:text-slate-800">
+                    <span class="material-symbols-outlined">close</span>
+                </button>
+            </div>
+            <div class="p-4 sm:p-6">
+                <div id="importResultsContent">
+                    <!-- Results will be displayed here -->
+                </div>
+            </div>
+            <div class="flex justify-end border-t border-slate-200 p-4 sm:p-6 sticky bottom-0 bg-white">
+                <button onclick="closeImportResultsModal()" class="h-11 rounded-lg bg-primary px-5 text-sm font-bold text-white hover:bg-primary/90">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Search and Filter Row -->
+    <div class="flex flex-row items-center gap-3 mb-4">
+        <div class="flex-1">
+            <label class="relative">
+                <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-500">search</span>
+                <input id="searchInput" class="form-input flex w-full min-w-0 flex-1 resize-none overflow-hidden rounded-lg text-slate-800 border-slate-200 focus:ring-primary focus:border-primary bg-white h-10 placeholder:text-slate-500 pl-10 pr-4 text-sm font-normal leading-normal" placeholder="Search components by name, UID, or category..." onkeyup="searchComponents()"/>
+            </label>
+        </div>
+        <div class="flex-shrink-0">
+            <button id="filterButton" onclick="toggleFilterDropdown()" class="flex h-10 items-center justify-center gap-x-2 rounded-lg bg-white border border-slate-200 px-4 hover:bg-slate-50">
+                <span class="material-symbols-outlined text-lg">filter_list</span>
+                <p class="text-sm font-medium leading-normal">Filters</p>
+                <span id="filterCount" class="hidden absolute -top-1 -right-1 flex items-center justify-center w-5 h-5 bg-primary text-white text-xs rounded-full">0</span>
+            </button>
+            <div id="filterDropdown" class="hidden absolute right-0 z-50 mt-2 w-80 sm:w-96 bg-white rounded-lg shadow-lg border border-slate-200 p-4">
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-slate-700 mb-2">Category</label>
+                    <select id="categoryFilter" class="form-select w-full rounded-lg border-slate-200 bg-white text-slate-900 focus:border-primary focus:ring-2 focus:ring-primary/20" onchange="applyFilters()">
+                        <option value="">All Categories</option>
+                        <option value="Microcontrollers">Microcontrollers</option>
+                        <option value="Sensors">Sensors</option>
+                        <option value="Actuators">Actuators</option>
+                        <option value="Accessories">Accessories</option>
+                        <option value="Tools">Tools</option>
+                        <option value="Others">Others</option>
+                    </select>
+                </div>
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-slate-700 mb-2">Lab</label>
+                    <select id="labFilter" class="form-select w-full rounded-lg border-slate-200 bg-white text-slate-900 focus:border-primary focus:ring-2 focus:ring-primary/20" onchange="applyFilters()">
+                        <option value="">All Labs</option>
+                        {% for lab in labs %}
+                        <option value="{{ lab.name }}">{{ lab.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                {% if not current_group and show_group_filter != False %}
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-slate-700 mb-2">Group</label>
+                    <select id="groupFilter" class="form-select w-full rounded-lg border-slate-200 bg-white text-slate-900 focus:border-primary focus:ring-2 focus:ring-primary/20" onchange="applyFilters()">
+                        <option value="">All Groups</option>
+                        {% for group in groups %}
+                        <option value="{{ group.name }}">{{ group.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                {% endif %}
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-slate-700 mb-2">Status</label>
+                    <select id="statusFilter" class="form-select w-full rounded-lg border-slate-200 bg-white text-slate-900 focus:border-primary focus:ring-2 focus:ring-primary/20" onchange="applyFilters()">
+                        <option value="">All Statuses</option>
+                        <option value="available">Available</option>
+                        <option value="low_stock">Low Stock</option>
+                        <option value="out_of_stock">Out of Stock</option>
+                    </select>
+                </div>
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-slate-700 mb-2">Stock Level</label>
+                    <select id="stockFilter" class="form-select w-full rounded-lg border-slate-200 bg-white text-slate-900 focus:border-primary focus:ring-2 focus:ring-primary/20" onchange="applyFilters()">
+                        <option value="">All Levels</option>
+                        <option value="low">Low Stock (≤10)</option>
+                        <option value="critical">Critical (≤5)</option>
+                        <option value="sufficient">Sufficient (>10)</option>
+                    </select>
+                </div>
+                <div class="flex justify-between">
+                    <button onclick="resetFilters()" class="px-3 py-1.5 text-sm text-slate-600 hover:text-slate-800">Reset</button>
+                    <button onclick="applyFilters()" class="px-3 py-1.5 bg-primary text-white text-sm rounded hover:bg-primary/90">Apply</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Active Filters Display -->
+    <div id="activeFilters" class="hidden flex flex-wrap gap-2 mb-4">
+        <!-- Active filter tags will be inserted here -->
+    </div>
+
+    <!-- Filtered Count Display -->
+    <div id="filteredCount" class="hidden mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+        <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+                <span class="material-symbols-outlined text-blue-600">filter_alt</span>
+                <span class="text-sm font-medium text-blue-800">Filtered Results</span>
+            </div>
+            <span id="filteredCountText" class="text-sm font-semibold text-blue-800"></span>
+        </div>
+    </div>
+
+    <!-- Mobile Cards View -->
+    <div id="mobileView" class="block lg:hidden">
+        <!-- Mobile Tabs -->
+        <div class="flex border-b border-slate-200 mb-4">
+            <button id="tab-all" class="flex-1 py-3 text-center text-sm font-medium text-primary border-b-2 border-primary" onclick="filterByTab('all')">All</button>
+            <button id="tab-available" class="flex-1 py-3 text-center text-sm font-medium text-slate-500 hover:text-primary" onclick="filterByTab('available')">Available</button>
+            <button id="tab-low-stock" class="flex-1 py-3 text-center text-sm font-medium text-slate-500 hover:text-primary" onclick="filterByTab('low_stock')">Low Stock</button>
+        </div>
+        
+        <div class="space-y-3">
+            {% for component in components %}
+            <div class="component-card bg-white rounded-lg border border-slate-200 p-4" 
+                 data-name="{{ component.name|lower }}" 
+                 data-uid="{{ component.uid|lower if component.uid else '' }}" 
+                 data-category="{{ component.category|lower }}" 
+                 data-lab="{{ component.lab|lower }}" 
+                 data-group="{{ component.group_name|lower if component.group_name else '' }}" 
+                 data-status="{{ component.status|lower }}" 
+                 data-current-quantity="{{ component.current_quantity }}">
+                <div class="flex justify-between items-start">
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-center gap-2 mb-1">
+                            <h3 class="font-bold text-lg text-slate-800 truncate">{{ component.name }}</h3>
+                            {% if component.uid %}
+                            <span class="bg-slate-100 text-slate-600 text-xs px-2 py-1 rounded font-mono">{{ component.uid }}</span>
+                            {% endif %}
+                        </div>
+                        <p class="text-sm text-slate-600 truncate">{{ component.category }} • {{ component.lab }}</p>
+                        {% if component.group_name and not current_group %}
+                        <div class="mt-1">
+                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium" style="background-color: {{ groups|selectattr('name', 'equalto', component.group_name)|map(attribute='color')|first }}20; color: {{ groups|selectattr('name', 'equalto', component.group_name)|map(attribute='color')|first }};">
+                                {{ component.group_name }}
+                            </span>
+                        </div>
+                        {% endif %}
+                    </div>
+                    <div class="flex gap-1 ml-2">
+                        <button onclick="editComponent('{{ component._id }}')" class="p-1.5 rounded-md hover:bg-slate-100 text-slate-500 hover:text-primary">
+                            <span class="material-symbols-outlined text-xl">edit</span>
+                        </button>
+                        <button onclick="deleteComponent('{{ component._id }}')" class="p-1.5 rounded-md hover:bg-slate-100 text-slate-500 hover:text-red-500">
+                            <span class="material-symbols-outlined text-xl">delete</span>
+                        </button>
+                    </div>
+                </div>
+                <div class="flex justify-between items-center mt-3">
+                    <div class="text-sm font-medium {% if component.current_quantity == 0 %}text-red-500{% elif component.current_quantity < 10 %}text-orange-500{% else %}text-slate-800{% endif %}">
+                        Qty: {{ component.current_quantity }}
+                    </div>
+                    <div>
+                        {% if component.status == 'available' %}
+                        <span class="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800">Available</span>
+                        {% elif component.status == 'low_stock' %}
+                        <span class="inline-flex items-center rounded-full bg-orange-100 px-2.5 py-0.5 text-xs font-medium text-orange-800">Low Stock</span>
+                        {% else %}
+                        <span class="inline-flex items-center rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-800">Out of Stock</span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        
+        <!-- No Results Message -->
+        <div id="noResults" class="hidden text-center py-12">
+            <span class="material-symbols-outlined text-4xl text-slate-300 mb-2">search_off</span>
+            <p class="text-slate-500">No components found matching your search criteria.</p>
+            <button onclick="resetFilters()" class="mt-2 text-primary hover:text-primary/80">Reset filters</button>
+        </div>
+    </div>
+
+    <!-- Desktop Table View -->
+    <div id="desktopView" class="hidden lg:block bg-white rounded-xl border border-slate-200 overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm text-left">
+                <thead class="bg-slate-50 text-xs uppercase font-medium text-slate-500">
+                    <tr>
+                        <th class="px-6 py-3" scope="col">UID</th>
+                        <th class="px-6 py-3" scope="col">Name</th>
+                        <th class="px-6 py-3" scope="col">Category</th>
+                        <th class="px-6 py-3" scope="col">Lab</th>
+                        {% if not current_group %}
+                        <th class="px-6 py-3" scope="col">Group</th>
+                        {% endif %}
+                        <th class="px-6 py-3 text-right" scope="col">Initial Qty</th>
+                        <th class="px-6 py-3 text-right" scope="col">Current Qty</th>
+                        <th class="px-6 py-3 text-center" scope="col">Status</th>
+                        <th class="px-6 py-3 text-center" scope="col">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="componentsTableBody">
+                    {% for component in components %}
+                    <tr class="component-row border-b border-slate-200 hover:bg-slate-50/50" 
+                        data-name="{{ component.name|lower }}" 
+                        data-uid="{{ component.uid|lower if component.uid else '' }}" 
+                        data-category="{{ component.category|lower }}" 
+                        data-lab="{{ component.lab|lower }}" 
+                        data-group="{{ component.group_name|lower if component.group_name else '' }}" 
+                        data-status="{{ component.status|lower }}" 
+                        data-current-quantity="{{ component.current_quantity }}">
+                        <td class="px-6 py-4 font-mono text-slate-600 text-sm">
+                            {% if component.uid %}
+                            {{ component.uid }}
+                            {% else %}
+                            <span class="text-slate-400">N/A</span>
+                            {% endif %}
+                        </td>
+                        <th class="px-6 py-4 font-medium whitespace-nowrap text-slate-800" scope="row">{{ component.name }}</th>
+                        <td class="px-6 py-4 text-slate-600">{{ component.category }}</td>
+                        <td class="px-6 py-4 text-slate-600">{{ component.lab }}</td>
+                        {% if not current_group %}
+                        <td class="px-6 py-4">
+                            {% if component.group_name %}
+                            <span class="inline-flex items-center px-2 py-1 rounded text-xs font-medium" style="background-color: {{ groups|selectattr('name', 'equalto', component.group_name)|map(attribute='color')|first }}20; color: {{ groups|selectattr('name', 'equalto', component.group_name)|map(attribute='color')|first }};">
+                                {{ component.group_name }}
+                            </span>
+                            {% else %}
+                            <span class="text-slate-400 text-xs">No Group</span>
+                            {% endif %}
+                        </td>
+                        {% endif %}
+                        <td class="px-6 py-4 text-right text-slate-600">{{ component.initial_quantity }}</td>
+                        <td class="px-6 py-4 text-right {% if component.current_quantity < 10 %}text-red-500 font-bold{% else %}text-slate-600{% endif %}">
+                            {{ component.current_quantity }}
+                        </td>
+                        <td class="px-6 py-4 text-center">
+                            {% if component.status == 'available' %}
+                            <span class="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800">Available</span>
+                            {% elif component.status == 'low_stock' %}
+                            <span class="inline-flex items-center rounded-full bg-orange-100 px-2.5 py-0.5 text-xs font-medium text-orange-800">Low Stock</span>
+                            {% else %}
+                            <span class="inline-flex items-center rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-800">Out of Stock</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-6 py-4">
+                            <div class="flex justify-center gap-2">
+                                <button onclick="editComponent('{{ component._id }}')" class="p-1.5 rounded-md hover:bg-slate-100 text-slate-500 hover:text-primary">
+                                    <span class="material-symbols-outlined text-xl">edit</span>
+                                </button>
+                                <button onclick="deleteComponent('{{ component._id }}')" class="p-1.5 rounded-md hover:bg-slate-100 text-slate-500 hover:text-red-500">
+                                    <span class="material-symbols-outlined text-xl">delete</span>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Pagination -->
+    <div class="flex flex-col sm:flex-row justify-between items-center mt-6 px-1">
+        {% set start_range = (current_page - 1) * 20 + 1 %}
+        {% set end_range = current_page * 20 %}
+        {% if end_range > total_components %}
+            {% set end_range = total_components %}
+        {% endif %}
+        
+        <span id="componentCount" class="text-sm text-slate-500 mb-4 sm:mb-0">
+            {% if current_group %}
+            Showing {{ start_range }} to {{ end_range }} of {{ total_components }} components in {{ current_group.name }}
+            {% else %}
+            Showing {{ start_range }} to {{ end_range }} of {{ total_components }} components
+            {% endif %}
+        </span>
+        <div class="inline-flex items-center -space-x-px text-sm">
+            <!-- Previous Button -->
+            <button class="flex items-center justify-center px-3 h-10 leading-tight bg-white border border-slate-200 rounded-l-lg hover:bg-slate-50 {% if current_page == 1 %}disabled opacity-50 cursor-not-allowed{% endif %}" 
+                    {% if current_page > 1 %}onclick="goToPage({{ current_page - 1 }})"{% endif %}>
+                Previous
+            </button>
+            
+            <!-- Page Numbers -->
+            {% for page in range(1, total_pages + 1) %}
+                {% if page == current_page %}
+                    <button class="flex items-center justify-center px-3 h-10 leading-tight bg-primary text-white border-y border-primary">
+                        {{ page }}
+                    </button>
+                {% else %}
+                    <button class="flex items-center justify-center px-3 h-10 leading-tight bg-white border-y border-slate-200 hover:bg-slate-50" onclick="goToPage({{ page }})">
+                        {{ page }}
+                    </button>
+                {% endif %}
+            {% endfor %}
+            
+            <!-- Next Button -->
+            <button class="flex items-center justify-center px-3 h-10 leading-tight bg-white border border-slate-200 rounded-r-lg hover:bg-slate-50 {% if current_page == total_pages %}disabled opacity-50 cursor-not-allowed{% endif %}" 
+                    {% if current_page < total_pages %}onclick="goToPage({{ current_page + 1 }})"{% endif %}>
+                Next
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Add/Edit Component Modal -->
+<div id="componentModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 hidden">
+    <div class="w-full max-w-md sm:max-w-lg rounded-xl bg-white shadow-xl max-h-[90vh] overflow-y-auto">
+        <div class="flex items-center justify-between border-b border-slate-200 p-4 sm:p-6 sticky top-0 bg-white">
+            <h3 class="text-xl font-bold text-slate-900" id="modalTitle">Add New Component</h3>
+            <button onclick="closeComponentModal()" class="text-slate-500 hover:text-slate-800">
+                <span class="material-symbols-outlined">close</span>
+            </button>
+        </div>
+        <form id="componentForm" class="flex flex-col gap-6 p-4 sm:p-6">
+            <input type="hidden" id="componentId">
+            <div>
+                <label class="mb-1.5 block text-sm font-medium text-slate-700" for="componentName">Component Name</label>
+                <input class="form-input w-full rounded-lg border-slate-200 bg-white text-slate-900 placeholder:text-slate-400 focus:border-primary focus:ring-2 focus:ring-primary/20" id="componentName" placeholder="e.g., Arduino Uno R3" type="text" required/>
+            </div>
+            <div>
+                <label class="mb-1.5 block text-sm font-medium text-slate-700" for="category">Category</label>
+                <select class="form-select w-full rounded-lg border-slate-200 bg-white text-slate-900 focus:border-primary focus:ring-2 focus:ring-primary/20" id="category" required onchange="handleCategoryChange()">
+                    <option value="">Select Category</option>
+                    <option value="Microcontrollers">Microcontrollers</option>
+                    <option value="Sensors">Sensors</option>
+                    <option value="Actuators">Actuators</option>
+                    <option value="Accessories">Accessories</option>
+                    <option value="Tools">Tools</option>
+                    <option value="Others">Others</option>
+                </select>
+                <div id="customCategoryDiv" class="mt-2 hidden">
+                    <input class="form-input w-full rounded-lg border-slate-200 bg-white text-slate-900 placeholder:text-slate-400 focus:border-primary focus:ring-2 focus:ring-primary/20" id="customCategory" placeholder="Enter custom category" type="text"/>
+                </div>
+            </div>
+            <div>
+                <label class="mb-1.5 block text-sm font-medium text-slate-700" for="lab">Lab</label>
+                <select class="form-select w-full rounded-lg border-slate-200 bg-white text-slate-900 focus:border-primary focus:ring-2 focus:ring-primary/20" id="lab" required>
+                    <option value="">Select Lab</option>
+                    {% for lab in labs %}
+                    <option value="{{ lab.name }}">{{ lab.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="mb-1.5 block text-sm font-medium text-slate-700" for="group">Component Group</label>
+                <select class="form-select w-full rounded-lg border-slate-200 bg-white text-slate-900 focus:border-primary focus:ring-2 focus:ring-primary/20" id="group">
+                    <option value="">No Group</option>
+                    {% for group in groups %}
+                    <option value="{{ group._id }}" {% if current_group and group._id == current_group._id %}selected{% endif %}>{{ group.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                    <label class="mb-1.5 block text-sm font-medium text-slate-700" for="initialQuantity">Initial Quantity</label>
+                    <input class="form-input w-full rounded-lg border-slate-200 bg-white text-slate-900 placeholder:text-slate-400 focus:border-primary focus:ring-2 focus:ring-primary/20" id="initialQuantity" placeholder="0" type="number" min="0" required/>
+                </div>
+                <div>
+                    <label class="mb-1.5 block text-sm font-medium text-slate-700" for="currentQuantity">Current Quantity</label>
+                    <input class="form-input w-full rounded-lg border-slate-200 bg-white text-slate-900 placeholder:text-slate-400 focus:border-primary focus:ring-2 focus:ring-primary/20" id="currentQuantity" placeholder="0" type="number" min="0" required/>
+                </div>
+            </div>
+            <div id="uidDisplay" class="hidden">
+                <label class="mb-1.5 block text-sm font-medium text-slate-700">Component UID</label>
+                <div class="p-3 bg-slate-50 rounded-lg border border-slate-200">
+                    <span id="uidValue" class="font-mono text-slate-700"></span>
+                    <p class="text-xs text-slate-500 mt-1">UID is automatically generated and cannot be changed</p>
+                </div>
+            </div>
+        </form>
+        <div class="flex justify-end gap-4 border-t border-slate-200 p-4 sm:p-6 sticky bottom-0 bg-white">
+            <button onclick="closeComponentModal()" class="h-11 rounded-lg px-5 text-sm font-bold bg-slate-100 text-slate-800 hover:bg-slate-200">Cancel</button>
+            <button onclick="saveComponent()" class="h-11 rounded-lg bg-primary px-5 text-sm font-bold text-white hover:bg-primary/90">Save Component</button>
+        </div>
+    </div>
+</div>
+
+<script>
+let currentEditingId = null;
+let activeTab = 'all';
+
+function openComponentModal(componentId = null) {
+    currentEditingId = componentId;
+    const modal = document.getElementById('componentModal');
+    const title = document.getElementById('modalTitle');
+    const uidDisplay = document.getElementById('uidDisplay');
+    
+    if (componentId) {
+        title.textContent = 'Edit Component';
+        uidDisplay.classList.remove('hidden');
+        fetchComponentData(componentId);
+    } else {
+        title.textContent = 'Add New Component';
+        uidDisplay.classList.add('hidden');
+        document.getElementById('componentForm').reset();
+        document.getElementById('customCategoryDiv').classList.add('hidden');
+        // Auto-select current group if viewing a group page
+        {% if current_group %}
+        document.getElementById('group').value = '{{ current_group._id }}';
+        {% else %}
+        document.getElementById('group').value = '';
+        {% endif %}
+    }
+    
+    modal.classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+}
+
+function closeComponentModal() {
+    document.getElementById('componentModal').classList.add('hidden');
+    document.getElementById('componentForm').reset();
+    currentEditingId = null;
+    document.body.style.overflow = 'auto';
+}
+
+function handleCategoryChange() {
+    const categorySelect = document.getElementById('category');
+    const customCategoryDiv = document.getElementById('customCategoryDiv');
+    const customCategoryInput = document.getElementById('customCategory');
+
+    if (categorySelect.value === 'Others') {
+        customCategoryDiv.classList.remove('hidden');
+        customCategoryInput.required = true;
+    } else {
+        customCategoryDiv.classList.add('hidden');
+        customCategoryInput.required = false;
+        customCategoryInput.value = '';
+    }
+}
+
+async function fetchComponentData(componentId) {
+    try {
+        const response = await fetch(`/api/components/${componentId}`);
+        if (response.ok) {
+            const component = await response.json();
+            document.getElementById('componentName').value = component.name;
+            
+            // Check if the category is one of the predefined ones
+            const predefinedCategories = ['Microcontrollers', 'Sensors', 'Actuators', 'Accessories', 'Tools'];
+            const categorySelect = document.getElementById('category');
+            const customCategoryDiv = document.getElementById('customCategoryDiv');
+            const customCategoryInput = document.getElementById('customCategory');
+            
+            if (predefinedCategories.includes(component.category)) {
+                categorySelect.value = component.category;
+                customCategoryDiv.classList.add('hidden');
+                customCategoryInput.value = '';
+            } else {
+                categorySelect.value = 'Others';
+                customCategoryDiv.classList.remove('hidden');
+                customCategoryInput.value = component.category;
+            }
+            
+            document.getElementById('lab').value = component.lab;
+            document.getElementById('group').value = component.group_id || '';
+            document.getElementById('initialQuantity').value = component.initial_quantity;
+            document.getElementById('currentQuantity').value = component.current_quantity;
+            
+            // Display UID for existing components
+            if (component.uid) {
+                document.getElementById('uidValue').textContent = component.uid;
+            }
+        } else {
+            alert('Error fetching component data');
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert('Error fetching component data');
+    }
+}
+
+async function saveComponent() {
+    const categorySelect = document.getElementById('category');
+    const customCategory = document.getElementById('customCategory').value;
+    
+    let categoryValue = categorySelect.value;
+    if (categoryValue === 'Others') {
+        categoryValue = customCategory;
+    }
+
+    const formData = {
+        name: document.getElementById('componentName').value,
+        category: categoryValue,
+        lab: document.getElementById('lab').value,
+        group_id: document.getElementById('group').value,
+        initial_quantity: parseInt(document.getElementById('initialQuantity').value),
+        current_quantity: parseInt(document.getElementById('currentQuantity').value)
+    };
+
+    try {
+        let response;
+        if (currentEditingId) {
+            response = await fetch(`/api/components/${currentEditingId}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(formData)
+            });
+        } else {
+            response = await fetch('/api/components', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(formData)
+            });
+        }
+
+        if (response.ok) {
+            const result = await response.json();
+            if (result.uid) {
+                alert(`Component created successfully! UID: ${result.uid}`);
+            }
+            closeComponentModal();
+            // Reload the current page to show the new component
+            window.location.reload();
+        } else {
+            const error = await response.json();
+            alert(error.error || 'Error saving component');
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert('Error saving component');
+    }
+}
+
+function editComponent(componentId) {
+    openComponentModal(componentId);
+}
+
+async function deleteComponent(componentId) {
+    if (confirm('Are you sure you want to delete this component?')) {
+        try {
+            const response = await fetch(`/api/components/${componentId}`, {
+                method: 'DELETE'
+            });
+
+            if (response.ok) {
+                // Reload the current page to reflect the deletion
+                window.location.reload();
+            } else {
+                const error = await response.json();
+                alert(error.error || 'Error deleting component');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            alert('Error deleting component');
+        }
+    }
+}
+
+// Pagination function
+function goToPage(page) {
+    // Get current URL parameters
+    const url = new URL(window.location.href);
+    url.searchParams.set('page', page);
+    window.location.href = url.toString();
+}
+
+// Import functionality
+function toggleImportDropdown() {
+    const dropdown = document.getElementById('importDropdown');
+    dropdown.classList.toggle('hidden');
+    
+    // Adjust dropdown position for mobile
+    if (window.innerWidth < 640) {
+        if (!dropdown.classList.contains('hidden')) {
+            dropdown.style.position = 'fixed';
+            dropdown.style.top = '50%';
+            dropdown.style.left = '50%';
+            dropdown.style.transform = 'translate(-50%, -50%)';
+            dropdown.style.width = '90%';
+            dropdown.style.maxWidth = '400px';
+            dropdown.style.maxHeight = '80vh';
+            dropdown.style.overflowY = 'auto';
+        } else {
+            // Reset styles when hiding
+            dropdown.style.position = '';
+            dropdown.style.top = '';
+            dropdown.style.left = '';
+            dropdown.style.transform = '';
+            dropdown.style.width = '';
+            dropdown.style.maxHeight = '';
+            dropdown.style.overflowY = '';
+        }
+    }
+}
+
+function downloadTemplate() {
+    // Create CSV template content with UID column
+    const templateContent = `name,category,lab,group,initial_quantity,current_quantity,uid
+Arduino Uno R3,Microcontrollers,Robotics Lab A,Project Design,50,42,COML1-001
+Raspberry Pi 4,Microcontrollers,IoT Prototyping Zone,Project Design,25,4,COML2-001
+SG90 Micro Servo Motor,Actuators,Robotics Lab A,Practical Implementation,75,61,COML1-002
+HC-SR04 Ultrasonic Sensor,Sensors,IoT Prototyping Zone,Practical Implementation,100,89,COML2-002
+DHT22 Temperature Sensor,Sensors,IoT Prototyping Zone,,60,45,COML2-003`;
+
+    // Create blob and download link
+    const blob = new Blob([templateContent], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'components_template.csv';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+}
+
+async function importComponents() {
+    const fileInput = document.getElementById('importFile');
+    const file = fileInput.files[0];
+    
+    if (!file) {
+        alert('Please select a file to import');
+        return;
+    }
+    
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    try {
+        const response = await fetch('/import-components', {
+            method: 'POST',
+            body: formData
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok) {
+            showImportResults(result);
+            toggleImportDropdown();
+            fileInput.value = '';
+            
+            // Reload the page if import was successful
+            if (result.imported_count > 0) {
+                setTimeout(() => {
+                    window.location.reload();
+                }, 3000);
+            }
+        } else {
+            alert(result.error || 'Error importing components');
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert('Error importing components');
+    }
+}
+
+function showImportResults(result) {
+    const modal = document.getElementById('importResultsModal');
+    const content = document.getElementById('importResultsContent');
+    
+    let html = `
+        <div class="mb-4">
+            <div class="flex items-center gap-2 mb-2">
+                <span class="material-symbols-outlined text-green-600">check_circle</span>
+                <h4 class="text-lg font-medium text-slate-800">Import Completed</h4>
+            </div>
+            <p class="text-sm text-slate-600">Successfully imported ${result.imported_count} of ${result.total_rows} components.</p>
+        </div>
+    `;
+    
+    if (result.errors && result.errors.length > 0) {
+        html += `
+            <div class="mb-4">
+                <div class="flex items-center gap-2 mb-2">
+                    <span class="material-symbols-outlined text-yellow-600">warning</span>
+                    <h4 class="text-lg font-medium text-slate-800">Errors (${result.errors.length})</h4>
+                </div>
+                <div class="max-h-60 overflow-y-auto bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                    <ul class="text-sm text-yellow-800 space-y-1">
+        `;
+        
+        result.errors.forEach(error => {
+            html += `<li>${error}</li>`;
+        });
+        
+        html += `
+                    </ul>
+                </div>
+            </div>
+        `;
+    }
+    
+    content.innerHTML = html;
+    modal.classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+}
+
+function closeImportResultsModal() {
+    document.getElementById('importResultsModal').classList.add('hidden');
+    document.body.style.overflow = 'auto';
+}
+
+// Tab filtering functionality
+function filterByTab(tab) {
+    activeTab = tab;
+    
+    // Update tab styles
+    const tabs = ['all', 'available', 'low-stock'];
+    tabs.forEach(t => {
+        const tabElement = document.getElementById(`tab-${t}`);
+        if (t === tab) {
+            tabElement.classList.add('text-primary', 'border-b-2', 'border-primary');
+            tabElement.classList.remove('text-slate-500');
+        } else {
+            tabElement.classList.remove('text-primary', 'border-b-2', 'border-primary');
+            tabElement.classList.add('text-slate-500');
+        }
+    });
+    
+    // Filter components based on tab
+    const mobileCards = document.querySelectorAll('#mobileView .component-card');
+    let visibleCount = 0;
+    
+    mobileCards.forEach(card => {
+        const status = card.getAttribute('data-status');
+        const currentQuantity = parseInt(card.getAttribute('data-current-quantity'));
+        
+        let showCard = true;
+        
+        if (tab === 'available') {
+            showCard = status === 'available' && currentQuantity > 0;
+        } else if (tab === 'low-stock') {
+            showCard = status === 'low_stock' || currentQuantity === 0;
+        }
+        
+        if (showCard) {
+            card.style.display = 'block';
+            visibleCount++;
+        } else {
+            card.style.display = 'none';
+        }
+    });
+    
+    // Update count and show/hide no results message
+    document.getElementById('componentCount').textContent = `Showing ${visibleCount} components`;
+    document.getElementById('noResults').classList.toggle('hidden', visibleCount > 0);
+}
+
+// Search functionality
+function searchComponents() {
+    const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+    const mobileCards = document.querySelectorAll('#mobileView .component-card');
+    const desktopRows = document.querySelectorAll('#desktopView .component-row');
+    let visibleCount = 0;
+    
+    // Filter mobile cards
+    mobileCards.forEach(card => {
+        const name = card.getAttribute('data-name');
+        const uid = card.getAttribute('data-uid');
+        const category = card.getAttribute('data-category');
+        const lab = card.getAttribute('data-lab');
+        const group = card.getAttribute('data-group');
+        
+        // Check if card matches search term and active tab
+        const matchesSearch = name.includes(searchTerm) || uid.includes(searchTerm) || category.includes(searchTerm) || lab.includes(searchTerm) || group.includes(searchTerm);
+        const matchesTab = checkTabMatch(card, activeTab);
+        
+        if (matchesSearch && matchesTab) {
+            card.style.display = 'block';
+            visibleCount++;
+        } else {
+            card.style.display = 'none';
+        }
+    });
+    
+    // Filter desktop rows
+    desktopRows.forEach(row => {
+        const name = row.getAttribute('data-name');
+        const uid = row.getAttribute('data-uid');
+        const category = row.getAttribute('data-category');
+        const lab = row.getAttribute('data-lab');
+        const group = row.getAttribute('data-group');
+        
+        // Check if row matches search term
+        const matchesSearch = name.includes(searchTerm) || uid.includes(searchTerm) || category.includes(searchTerm) || lab.includes(searchTerm) || group.includes(searchTerm);
+        
+        if (matchesSearch) {
+            row.style.display = '';
+            visibleCount++;
+        } else {
+            row.style.display = 'none';
+        }
+    });
+    
+    // Update count and show/hide no results message
+    document.getElementById('componentCount').textContent = `Showing ${visibleCount} components`;
+    document.getElementById('noResults').classList.toggle('hidden', visibleCount > 0);
+    
+    // Show/hide filtered count
+    updateFilteredCount(visibleCount);
+}
+
+// Helper function to check if component matches active tab
+function checkTabMatch(element, tab) {
+    if (tab === 'all') return true;
+    
+    const status = element.getAttribute('data-status');
+    const currentQuantity = parseInt(element.getAttribute('data-current-quantity'));
+    
+    if (tab === 'available') {
+        return status === 'available' && currentQuantity > 0;
+    } else if (tab === 'low-stock') {
+        return status === 'low_stock' || currentQuantity === 0;
+    }
+    
+    return true;
+}
+
+// Filter functionality
+function toggleFilterDropdown() {
+    const dropdown = document.getElementById('filterDropdown');
+    dropdown.classList.toggle('hidden');
+    
+    // Adjust dropdown position for mobile
+    if (window.innerWidth < 640) {
+        if (!dropdown.classList.contains('hidden')) {
+            dropdown.style.position = 'fixed';
+            dropdown.style.top = '50%';
+            dropdown.style.left = '50%';
+            dropdown.style.transform = 'translate(-50%, -50%)';
+            dropdown.style.width = '90%';
+            dropdown.style.maxWidth = '400px';
+            dropdown.style.maxHeight = '80vh';
+            dropdown.style.overflowY = 'auto';
+        } else {
+            // Reset styles when hiding
+            dropdown.style.position = '';
+            dropdown.style.top = '';
+            dropdown.style.left = '';
+            dropdown.style.transform = '';
+            dropdown.style.width = '';
+            dropdown.style.maxHeight = '';
+            dropdown.style.overflowY = '';
+        }
+    }
+}
+
+function applyFilters() {
+    const categoryFilter = document.getElementById('categoryFilter').value.toLowerCase();
+    const labFilter = document.getElementById('labFilter').value.toLowerCase();
+    const groupFilter = document.getElementById('groupFilter') ? document.getElementById('groupFilter').value.toLowerCase() : '';
+    const statusFilter = document.getElementById('statusFilter').value.toLowerCase();
+    const stockFilter = document.getElementById('stockFilter').value;
+    
+    const mobileCards = document.querySelectorAll('#mobileView .component-card');
+    const desktopRows = document.querySelectorAll('#desktopView .component-row');
+    let visibleCount = 0;
+    
+    // Filter mobile cards
+    mobileCards.forEach(card => {
+        const category = card.getAttribute('data-category');
+        const lab = card.getAttribute('data-lab');
+        const group = card.getAttribute('data-group');
+        const status = card.getAttribute('data-status');
+        const currentQuantity = parseInt(card.getAttribute('data-current-quantity'));
+        
+        const categoryMatch = !categoryFilter || category === categoryFilter;
+        const labMatch = !labFilter || lab === labFilter;
+        const groupMatch = !groupFilter || group === groupFilter;
+        const statusMatch = !statusFilter || status === statusFilter;
+        
+        let stockMatch = true;
+        if (stockFilter === 'low') {
+            stockMatch = currentQuantity <= 10;
+        } else if (stockFilter === 'critical') {
+            stockMatch = currentQuantity <= 5;
+        } else if (stockFilter === 'sufficient') {
+            stockMatch = currentQuantity > 10;
+        }
+        
+        // Check if card matches active tab
+        const tabMatch = checkTabMatch(card, activeTab);
+        
+        if (categoryMatch && labMatch && groupMatch && statusMatch && stockMatch && tabMatch) {
+            card.style.display = 'block';
+            visibleCount++;
+        } else {
+            card.style.display = 'none';
+        }
+    });
+    
+    // Filter desktop rows
+    desktopRows.forEach(row => {
+        const category = row.getAttribute('data-category');
+        const lab = row.getAttribute('data-lab');
+        const group = row.getAttribute('data-group');
+        const status = row.getAttribute('data-status');
+        const currentQuantity = parseInt(row.getAttribute('data-current-quantity'));
+        
+        const categoryMatch = !categoryFilter || category === categoryFilter;
+        const labMatch = !labFilter || lab === labFilter;
+        const groupMatch = !groupFilter || group === groupFilter;
+        const statusMatch = !statusFilter || status === statusFilter;
+        
+        let stockMatch = true;
+        if (stockFilter === 'low') {
+            stockMatch = currentQuantity <= 10;
+        } else if (stockFilter === 'critical') {
+            stockMatch = currentQuantity <= 5;
+        } else if (stockFilter === 'sufficient') {
+            stockMatch = currentQuantity > 10;
+        }
+        
+        if (categoryMatch && labMatch && groupMatch && statusMatch && stockMatch) {
+            row.style.display = '';
+            visibleCount++;
+        } else {
+            row.style.display = 'none';
+        }
+    });
+    
+    // Update count and show/hide no results message
+    document.getElementById('componentCount').textContent = `Showing ${visibleCount} components`;
+    document.getElementById('noResults').classList.toggle('hidden', visibleCount > 0);
+    
+    // Show/hide filtered count
+    updateFilteredCount(visibleCount);
+    
+    // Update active filters display
+    updateActiveFilters();
+    
+    // Update filter count badge
+    const activeFilterCount = [categoryFilter, labFilter, groupFilter, statusFilter, stockFilter].filter(f => f).length;
+    const filterCount = document.getElementById('filterCount');
+    if (activeFilterCount > 0) {
+        filterCount.textContent = activeFilterCount;
+        filterCount.classList.remove('hidden');
+    } else {
+        filterCount.classList.add('hidden');
+    }
+    
+    // Close filter dropdown
+    document.getElementById('filterDropdown').classList.add('hidden');
+}
+
+// Update filtered count display
+function updateFilteredCount(visibleCount) {
+    const filteredCountDiv = document.getElementById('filteredCount');
+    const filteredCountText = document.getElementById('filteredCountText');
+    const categoryFilter = document.getElementById('categoryFilter').value;
+    const labFilter = document.getElementById('labFilter').value;
+    const groupFilter = document.getElementById('groupFilter') ? document.getElementById('groupFilter').value : '';
+    const statusFilter = document.getElementById('statusFilter').value;
+    const stockFilter = document.getElementById('stockFilter').value;
+    const searchTerm = document.getElementById('searchInput').value;
+    
+    // Check if any filters are applied
+    const hasFilters = categoryFilter || labFilter || groupFilter || statusFilter || stockFilter || searchTerm || activeTab !== 'all';
+    
+    if (hasFilters && visibleCount > 0) {
+        // Build filter description
+        let filterDesc = [];
+        if (categoryFilter) filterDesc.push(`Category: ${categoryFilter}`);
+        if (labFilter) filterDesc.push(`Lab: ${labFilter}`);
+        if (groupFilter) filterDesc.push(`Group: ${groupFilter}`);
+        if (statusFilter) filterDesc.push(`Status: ${statusFilter}`);
+        if (stockFilter) filterDesc.push(`Stock: ${stockFilter}`);
+        if (searchTerm) filterDesc.push(`Search: "${searchTerm}"`);
+        if (activeTab !== 'all') filterDesc.push(`Tab: ${activeTab}`);
+        
+        filteredCountText.textContent = `${visibleCount} record${visibleCount !== 1 ? 's' : ''} found`;
+        filteredCountDiv.classList.remove('hidden');
+    } else {
+        filteredCountDiv.classList.add('hidden');
+    }
+}
+
+function updateActiveFilters() {
+    const activeFiltersContainer = document.getElementById('activeFilters');
+    const categoryFilter = document.getElementById('categoryFilter').value;
+    const labFilter = document.getElementById('labFilter').value;
+    const groupFilter = document.getElementById('groupFilter') ? document.getElementById('groupFilter').value : '';
+    const statusFilter = document.getElementById('statusFilter').value;
+    const stockFilter = document.getElementById('stockFilter').value;
+    
+    // Clear existing filters
+    activeFiltersContainer.innerHTML = '';
+    
+    // Add active filter tags
+    if (categoryFilter) {
+        addFilterTag('Category', categoryFilter);
+    }
+    if (labFilter) {
+        addFilterTag('Lab', labFilter);
+    }
+    if (groupFilter) {
+        addFilterTag('Group', groupFilter);
+    }
+    if (statusFilter) {
+        addFilterTag('Status', statusFilter);
+    }
+    if (stockFilter) {
+        addFilterTag('Stock Level', stockFilter);
+    }
+    
+    // Show/hide active filters container
+    activeFiltersContainer.classList.toggle('hidden', !categoryFilter && !labFilter && !groupFilter && !statusFilter && !stockFilter);
+}
+
+function addFilterTag(label, value) {
+    const activeFiltersContainer = document.getElementById('activeFilters');
+    const tag = document.createElement('div');
+    tag.className = 'flex items-center gap-1 px-3 py-1 bg-slate-100 rounded-full text-sm';
+    tag.innerHTML = `
+        <span class="text-slate-700">${label}: ${value}</span>
+        <button onclick="removeFilter('${label.toLowerCase().replace(' ', '_')}')" class="text-slate-500 hover:text-slate-700">
+            <span class="material-symbols-outlined text-base">close</span>
+        </button>
+    `;
+    activeFiltersContainer.appendChild(tag);
+}
+
+function removeFilter(filterType) {
+    if (filterType === 'category') {
+        document.getElementById('categoryFilter').value = '';
+    } else if (filterType === 'lab') {
+        document.getElementById('labFilter').value = '';
+    } else if (filterType === 'group') {
+        document.getElementById('groupFilter').value = '';
+    } else if (filterType === 'status') {
+        document.getElementById('statusFilter').value = '';
+    } else if (filterType === 'stock_level') {
+        document.getElementById('stockFilter').value = '';
+    }
+    applyFilters();
+}
+
+function resetFilters() {
+    document.getElementById('categoryFilter').value = '';
+    document.getElementById('labFilter').value = '';
+    if (document.getElementById('groupFilter')) {
+        document.getElementById('groupFilter').value = '';
+    }
+    document.getElementById('statusFilter').value = '';
+    document.getElementById('stockFilter').value = '';
+    document.getElementById('searchInput').value = '';
+    
+    // Reset to All tab
+    filterByTab('all');
+    
+    applyFilters();
+    searchComponents();
+}
+
+// Close modal when clicking outside
+document.getElementById('componentModal').addEventListener('click', function(e) {
+    if (e.target === this) {
+        closeComponentModal();
+    }
+});
+
+document.getElementById('importResultsModal').addEventListener('click', function(e) {
+    if (e.target === this) {
+        closeImportResultsModal();
+    }
+});
+
+// Close modal with Escape key
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        closeComponentModal();
+        closeImportResultsModal();
+        document.getElementById('importDropdown').classList.add('hidden');
+        document.getElementById('filterDropdown').classList.add('hidden');
+    }
+});
+
+// Close dropdowns when clicking outside
+document.addEventListener('click', function(e) {
+    const filterButton = document.getElementById('filterButton');
+    const filterDropdown = document.getElementById('filterDropdown');
+    const importButton = document.querySelector('button[onclick="toggleImportDropdown()"]');
+    const importDropdown = document.getElementById('importDropdown');
+    
+    if (filterButton && filterDropdown && !filterButton.contains(e.target) && !filterDropdown.contains(e.target)) {
+        filterDropdown.classList.add('hidden');
+    }
+    
+    if (importButton && importDropdown && !importButton.contains(e.target) && !importDropdown.contains(e.target)) {
+        importDropdown.classList.add('hidden');
+    }
+});
+
+// Prevent body scroll when dropdowns are open
+function preventBodyScroll() {
+    const filterDropdown = document.getElementById('filterDropdown');
+    const importDropdown = document.getElementById('importDropdown');
+    
+    if (!filterDropdown.classList.contains('hidden') || !importDropdown.classList.contains('hidden')) {
+        document.body.style.overflow = 'hidden';
+    } else {
+        document.body.style.overflow = 'auto';
+    }
+}
+
+// Initialize
+document.addEventListener('DOMContentLoaded', function() {
+    // Add event listeners for dropdown visibility changes
+    const filterDropdown = document.getElementById('filterDropdown');
+    const importDropdown = document.getElementById('importDropdown');
+    
+    const observer = new MutationObserver(function(mutations) {
+        mutations.forEach(function(mutation) {
+            if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
+                preventBodyScroll();
+            }
+        });
+    });
+    
+    if (filterDropdown) {
+        observer.observe(filterDropdown, { attributes: true });
+    }
+    if (importDropdown) {
+        observer.observe(importDropdown, { attributes: true });
+    }
+});
+</script>
+{% endblock %}

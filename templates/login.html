@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+
+{% block title %}SN LabTrack - Login{% endblock %}
+
+{% block content_no_sidebar %}
+<div class="min-h-screen flex bg-white">
+    <!-- Left Column - Login Form -->
+    <div class="flex-1 flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-20 xl:px-24 bg-white">
+        <div class="mx-auto w-full max-w-sm lg:w-96">
+            <div class="flex flex-col items-center space-y-4 mb-8">
+                <div class="text-center">
+                    <h1 class="text-[#111827] dark:text-white tracking-tight text-[32px] font-bold leading-tight">SN LabTrack</h1>
+                    <p class="text-[#6b7280] dark:text-slate-400 text-base font-normal leading-normal pt-1">Sign in to access the system.</p>
+                </div>
+            </div>
+
+            <!-- Flash Messages -->
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="flash-message mb-6 p-4 rounded-lg {% if category == 'error' %}bg-red-100 text-red-700{% else %}bg-green-100 text-green-700{% endif %}">
+                            {{ message }}
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+
+            <!-- Role Selection -->
+            <div class="mb-6">
+                <label class="block text-sm font-medium text-slate-700 mb-2">Login As</label>
+                <div class="flex rounded-lg border border-slate-200 bg-slate-50 p-1">
+                    <button type="button" id="adminBtn" class="flex-1 py-2 px-3 rounded-md text-sm font-medium transition-all bg-white text-primary shadow-sm">
+                        Admin
+                    </button>
+                    <button type="button" id="trainerBtn" class="flex-1 py-2 px-3 rounded-md text-sm font-medium transition-all text-slate-600 hover:text-slate-800">
+                        Trainer
+                    </button>
+                </div>
+            </div>
+
+            <form class="space-y-6" method="POST" action="{{ url_for('login') }}">
+                <input type="hidden" name="role" id="roleInput" value="admin">
+                
+                <div class="flex flex-col gap-4">
+                    <!-- Username Input Field -->
+                    <label class="flex flex-col w-full">
+                        <p class="text-[#111827] dark:text-slate-300 text-base font-medium leading-normal pb-2">Username</p>
+                        <input name="username" class="form-input flex w-full min-w-0 flex-1 resize-none overflow-hidden rounded-lg text-[#111827] dark:text-white focus:outline-0 focus:ring-2 focus:ring-primary/50 border border-[#D1D5DB] dark:border-slate-700 bg-white dark:bg-background-dark h-14 placeholder:text-[#9ca3af] dark:placeholder:text-slate-500 p-[15px] text-base font-normal leading-normal" placeholder="Enter your username" type="text" required/>
+                    </label>
+                    <!-- Password Input Field -->
+                    <label class="flex flex-col w-full">
+                        <p class="text-[#111827] dark:text-slate-300 text-base font-medium leading-normal pb-2">Password</p>
+                        <div class="relative flex w-full flex-1 items-stretch">
+                            <input name="password" id="password" class="form-input flex w-full min-w-0 flex-1 resize-none overflow-hidden rounded-lg text-[#111827] dark:text-white focus:outline-0 focus:ring-2 focus:ring-primary/50 border border-[#D1D5DB] dark:border-slate-700 bg-white dark:bg-background-dark h-14 placeholder:text-[#9ca3af] dark:placeholder:text-slate-500 p-[15px] pr-12 text-base font-normal leading-normal" placeholder="Enter your password" type="password" required/>
+                            <button type="button" onclick="togglePassword()" class="absolute inset-y-0 right-0 flex items-center pr-4 text-[#6b7280] dark:text-slate-400 hover:text-[#111827] dark:hover:text-white">
+                                <span class="material-symbols-outlined password-toggle">visibility_off</span>
+                            </button>
+                        </div>
+                    </label>
+                </div>
+                <!-- Login Button -->
+                <button type="submit" class="flex h-14 w-full cursor-pointer items-center justify-center rounded-lg bg-primary px-4 py-2.5 text-base font-semibold text-white shadow-sm hover:bg-primary/90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">Log In</button>
+            </form>
+        </div>
+        
+        <footer class="mt-auto pt-8 text-center">
+            <p class="text-[#6b7280] dark:text-slate-500 text-sm">© 2025 Robotics Lab. All Rights Reserved.</p>
+        </footer>
+    </div>
+
+    <!-- Right Column - Image -->
+    <div class="hidden lg:flex flex-1 bg-white">
+        <div class="flex items-center justify-center w-full p-12">
+            <div class="text-center">
+                <img src="https://i.ibb.co/Y7sCQ59H/image-removebg-preview-35.png" alt="Lab Equipment" class="mx-auto w-full max-w-md">
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Role selection functionality
+const adminBtn = document.getElementById('adminBtn');
+const trainerBtn = document.getElementById('trainerBtn');
+const roleInput = document.getElementById('roleInput');
+
+adminBtn.addEventListener('click', () => {
+    adminBtn.classList.add('bg-white', 'text-primary', 'shadow-sm');
+    adminBtn.classList.remove('text-slate-600', 'hover:text-slate-800');
+    trainerBtn.classList.remove('bg-white', 'text-primary', 'shadow-sm');
+    trainerBtn.classList.add('text-slate-600', 'hover:text-slate-800');
+    roleInput.value = 'admin';
+});
+
+trainerBtn.addEventListener('click', () => {
+    trainerBtn.classList.add('bg-white', 'text-primary', 'shadow-sm');
+    trainerBtn.classList.remove('text-slate-600', 'hover:text-slate-800');
+    adminBtn.classList.remove('bg-white', 'text-primary', 'shadow-sm');
+    adminBtn.classList.add('text-slate-600', 'hover:text-slate-800');
+    roleInput.value = 'trainer';
+});
+
+// Password visibility toggle
+function togglePassword() {
+    const passwordInput = document.getElementById('password');
+    const toggleIcon = document.querySelector('.password-toggle');
+    if (passwordInput.type === 'password') {
+        passwordInput.type = 'text';
+        toggleIcon.textContent = 'visibility';
+    } else {
+        passwordInput.type = 'password';
+        toggleIcon.textContent = 'visibility_off';
+    }
+}
+</script>
+{% endblock %}

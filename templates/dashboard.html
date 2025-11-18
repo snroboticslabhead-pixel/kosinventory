@@ -1,0 +1,314 @@
+{% extends "base.html" %}
+
+{% block title %}Admin Dashboard - Lab Inventory System{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto">
+    <!-- Flash Messages -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="flash-message mb-4 lg:mb-6 p-4 rounded-lg {% if category == 'error' %}bg-red-100 text-red-700{% else %}bg-green-100 text-green-700{% endif %}">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <!-- Page Header -->
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 lg:mb-8">
+        <div class="flex flex-col">
+            <h1 class="text-2xl lg:text-3xl font-bold leading-tight tracking-tight text-slate-800">
+                {% if user_role == 'admin' %}Admin Dashboard
+                {% else %}Trainer Dashboard - {{ lab_name }}{% endif %}
+            </h1>
+            <p class="text-sm lg:text-base font-normal leading-normal text-slate-500">
+                {% if user_role == 'admin' %}Overview of your lab inventory system with tracking insights.
+                {% else %}Manage components and track usage for your assigned lab.{% endif %}
+            </p>
+        </div>
+    </div>
+    
+    <!-- Enhanced Stats Grid -->
+    <div class="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3 lg:gap-6">
+        {% if user_role == 'admin' %}
+        <!-- Admin Stats -->
+        <div class="flex flex-col gap-1 lg:gap-2 rounded-xl p-4 lg:p-6 bg-white border border-slate-200">
+            <p class="text-slate-600 text-xs lg:text-sm font-medium leading-normal">Total Labs</p>
+            <p class="text-slate-900 tracking-tight text-xl lg:text-3xl font-bold leading-tight">{{ total_labs }}</p>
+        </div>
+        <div class="flex flex-col gap-1 lg:gap-2 rounded-xl p-4 lg:p-6 bg-white border border-slate-200">
+            <p class="text-slate-600 text-xs lg:text-sm font-medium leading-normal">Total Components</p>
+            <p class="text-slate-900 tracking-tight text-xl lg:text-3xl font-bold leading-tight">{{ total_components }}</p>
+        </div>
+        <div class="flex flex-col gap-1 lg:gap-2 rounded-xl p-4 lg:p-6 bg-white border border-slate-200">
+            <p class="text-slate-600 text-xs lg:text-sm font-medium leading-normal">Total Trainers</p>
+            <p class="text-slate-900 tracking-tight text-xl lg:text-3xl font-bold leading-tight">{{ total_trainers }}</p>
+        </div>
+        {% else %}
+        <!-- Trainer Stats -->
+        <div class="flex flex-col gap-1 lg:gap-2 rounded-xl p-4 lg:p-6 bg-white border border-slate-200">
+            <p class="text-slate-600 text-xs lg:text-sm font-medium leading-normal">Assigned Lab</p>
+            <p class="text-slate-900 tracking-tight text-lg lg:text-xl font-bold leading-tight truncate">{{ lab_name }}</p>
+        </div>
+        <div class="flex flex-col gap-1 lg:gap-2 rounded-xl p-4 lg:p-6 bg-white border border-slate-200">
+            <p class="text-slate-600 text-xs lg:text-sm font-medium leading-normal">My Components</p>
+            <p class="text-slate-900 tracking-tight text-xl lg:text-3xl font-bold leading-tight">{{ total_components }}</p>
+        </div>
+        {% endif %}
+        
+        <!-- Shared Stats -->
+        <div class="flex flex-col gap-1 lg:gap-2 rounded-xl p-4 lg:p-6 bg-white border border-slate-200">
+            <p class="text-slate-600 text-xs lg:text-sm font-medium leading-normal">Issued Today</p>
+            <p class="text-slate-900 tracking-tight text-xl lg:text-3xl font-bold leading-tight">{{ issued_today }}</p>
+        </div>
+        <div class="flex flex-col gap-1 lg:gap-2 rounded-xl p-4 lg:p-6 bg-white border border-slate-200">
+            <p class="text-slate-600 text-xs lg:text-sm font-medium leading-normal">Pending Returns</p>
+            <p class="text-slate-900 tracking-tight text-xl lg:text-3xl font-bold leading-tight">{{ pending_returns }}</p>
+        </div>
+        <div class="flex flex-col gap-1 lg:gap-2 rounded-xl p-4 lg:p-6 bg-white border border-slate-200">
+            <p class="text-slate-600 text-xs lg:text-sm font-medium leading-normal">Low Stock</p>
+            <p class="text-red-500 tracking-tight text-xl lg:text-3xl font-bold leading-tight">{{ low_stock }}</p>
+        </div>
+        {% if user_role == 'admin' %}
+        <div class="col-span-2 lg:col-span-1 flex flex-col gap-1 lg:gap-2 rounded-xl p-4 lg:p-6 bg-white border border-slate-200">
+            <p class="text-slate-600 text-xs lg:text-sm font-medium leading-normal">Overdue Items</p>
+            <p class="text-orange-500 tracking-tight text-xl lg:text-3xl font-bold leading-tight">{{ overdue_count if overdue_count else 0 }}</p>
+        </div>
+        {% endif %}
+    </div>
+    
+    <!-- Main Content Grid -->
+    <div class="grid grid-cols-1 xl:grid-cols-12 gap-6 mt-6 lg:mt-8">
+        <!-- Recent Activity & Quick Actions -->
+        <div class="xl:col-span-8">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- Recent Activity -->
+                <div class="bg-white rounded-xl border border-slate-200 p-4 lg:p-6">
+                    <h2 class="text-lg lg:text-xl font-bold leading-tight tracking-[-0.015em] mb-4">Recent Activity</h2>
+                    {% if recent_transactions %}
+                    <ul class="space-y-3 lg:space-y-4">
+                        {% for transaction in recent_transactions %}
+                        <li class="flex items-start gap-3">
+                            <div class="flex h-6 lg:h-8 w-6 lg:w-8 items-center justify-center rounded-full bg-blue-100 flex-shrink-0">
+                                <span class="material-symbols-outlined text-blue-600 text-sm lg:text-lg">arrow_upward</span>
+                            </div>
+                            <div class="min-w-0 flex-1">
+                                <p class="text-sm font-medium text-slate-700 truncate">{{ transaction.quantity_issued }}x {{ transaction.component_name }} issued to {{ transaction.issued_to }}</p>
+                                <p class="text-xs text-slate-500">
+                                    {% if transaction.issue_date %}
+                                        {{ transaction.issue_date|timezone_filter('Asia/Kolkata')|datetime_format('%Y-%m-%d %H:%M') }}
+                                    {% else %}
+                                        Date not available
+                                    {% endif %}
+                                </p>
+                            </div>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                    {% else %}
+                    <div class="text-center py-4 text-slate-500">
+                        <span class="material-symbols-outlined text-3xl mb-2 text-slate-300">inventory_2</span>
+                        <p class="text-sm">No recent activity</p>
+                    </div>
+                    {% endif %}
+                </div>
+                
+                <!-- Quick Actions -->
+                <div class="bg-white rounded-xl border border-slate-200 p-4 lg:p-6">
+                    <h2 class="text-lg lg:text-xl font-bold leading-tight tracking-[-0.015em] mb-4">Quick Actions</h2>
+                    <div class="grid grid-cols-1 gap-3 lg:gap-4">
+                        <a href="{{ url_for('components') }}" class="flex items-center gap-3 p-3 lg:p-4 border border-slate-200 rounded-lg hover:bg-slate-50">
+                            <span class="material-symbols-outlined text-primary text-xl lg:text-2xl">inventory_2</span>
+                            <div class="min-w-0 flex-1">
+                                <p class="font-medium text-slate-800 text-sm lg:text-base">Manage Components</p>
+                                <p class="text-xs lg:text-sm text-slate-500 truncate">View and edit component inventory</p>
+                            </div>
+                        </a>
+                        <a href="{{ url_for('issue_return') }}" class="flex items-center gap-3 p-3 lg:p-4 border border-slate-200 rounded-lg hover:bg-slate-50">
+                            <span class="material-symbols-outlined text-primary text-xl lg:text-2xl">compare_arrows</span>
+                            <div class="min-w-0 flex-1">
+                                <p class="font-medium text-slate-800 text-sm lg:text-base">Issue Components</p>
+                                <p class="text-xs lg:text-sm text-slate-500 truncate">Issue components to users</p>
+                            </div>
+                        </a>
+                        {% if user_role == 'admin' %}
+                        <a href="{{ url_for('trainers') }}" class="flex items-center gap-3 p-3 lg:p-4 border border-slate-200 rounded-lg hover:bg-slate-50">
+                            <span class="material-symbols-outlined text-primary text-xl lg:text-2xl">supervisor_account</span>
+                            <div class="min-w-0 flex-1">
+                                <p class="font-medium text-slate-800 text-sm lg:text-base">Manage Trainers</p>
+                                <p class="text-xs lg:text-sm text-slate-500 truncate">Create and manage trainer accounts</p>
+                            </div>
+                        </a>
+                        {% endif %}
+                        <a href="{{ url_for('reports') }}" class="flex items-center gap-3 p-3 lg:p-4 border border-slate-200 rounded-lg hover:bg-slate-50">
+                            <span class="material-symbols-outlined text-primary text-xl lg:text-2xl">assessment</span>
+                            <div class="min-w-0 flex-1">
+                                <p class="font-medium text-slate-800 text-sm lg:text-base">View Reports</p>
+                                <p class="text-xs lg:text-sm text-slate-500 truncate">Analytics and usage reports</p>
+                            </div>
+                        </a>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- System Alerts -->
+            <div class="mt-6 bg-white rounded-xl border border-slate-200 p-4 lg:p-6">
+                <h2 class="text-lg lg:text-xl font-bold leading-tight tracking-[-0.015em] mb-4">System Alerts</h2>
+                <div class="space-y-3">
+                    {% if low_stock > 0 %}
+                    <div class="flex items-center gap-3 p-3 bg-red-50 rounded-lg border border-red-200">
+                        <span class="material-symbols-outlined text-red-600">inventory</span>
+                        <div class="flex-1">
+                            <p class="text-sm font-medium text-slate-800">Low Stock Alert</p>
+                            <p class="text-xs text-slate-600">{{ low_stock }} components are running low on stock</p>
+                        </div>
+                        <a href="{{ url_for('components') }}" class="text-red-600 hover:text-red-700 text-sm font-medium">View</a>
+                    </div>
+                    {% endif %}
+                    
+                    {% if pending_returns > 0 %}
+                    <div class="flex items-center gap-3 p-3 bg-yellow-50 rounded-lg border border-yellow-200">
+                        <span class="material-symbols-outlined text-yellow-600">pending</span>
+                        <div class="flex-1">
+                            <p class="text-sm font-medium text-slate-800">Pending Returns</p>
+                            <p class="text-xs text-slate-600">{{ pending_returns }} transactions have pending returns</p>
+                        </div>
+                        <a href="{{ url_for('issue_return') }}" class="text-yellow-600 hover:text-yellow-700 text-sm font-medium">Manage</a>
+                    </div>
+                    {% endif %}
+                    
+                    {% if user_role == 'admin' and overdue_count and overdue_count > 0 %}
+                    <div class="flex items-center gap-3 p-3 bg-orange-50 rounded-lg border border-orange-200">
+                        <span class="material-symbols-outlined text-orange-600">schedule</span>
+                        <div class="flex-1">
+                            <p class="text-sm font-medium text-slate-800">Overdue Items</p>
+                            <p class="text-xs text-slate-600">{{ overdue_count }} items are overdue for return</p>
+                        </div>
+                        <a href="{{ url_for('overdue_items') }}" class="text-orange-600 hover:text-orange-700 text-sm font-medium">Manage</a>
+                    </div>
+                    {% endif %}
+                    
+                    {% if low_stock == 0 and pending_returns == 0 and (not overdue_count or overdue_count == 0) %}
+                    <div class="text-center py-4 text-slate-500">
+                        <span class="material-symbols-outlined text-3xl mb-2 text-green-600">check_circle</span>
+                        <p class="text-sm">All systems normal. No alerts at this time.</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <!-- Tracking Overview -->
+        <div class="xl:col-span-4">
+            <div class="bg-white rounded-xl border border-slate-200 p-4 lg:p-6">
+                <h2 class="text-lg lg:text-xl font-bold leading-tight tracking-[-0.015em] mb-4">Quick Access</h2>
+                <div class="space-y-4">
+                    <a href="{{ url_for('components') }}" class="flex items-center gap-3 p-3 border border-slate-200 rounded-lg hover:bg-slate-50">
+                        <span class="material-symbols-outlined text-purple-600 text-xl">inventory_2</span>
+                        <div class="min-w-0 flex-1">
+                            <p class="font-medium text-slate-800 text-sm">Component Inventory</p>
+                            <p class="text-xs text-slate-500">View and manage components</p>
+                        </div>
+                        <span class="material-symbols-outlined text-slate-400">chevron_right</span>
+                    </a>
+                    
+                    {% if user_role == 'admin' %}
+                    <a href="{{ url_for('trainers') }}" class="flex items-center gap-3 p-3 border border-slate-200 rounded-lg hover:bg-slate-50">
+                        <span class="material-symbols-outlined text-blue-600 text-xl">supervisor_account</span>
+                        <div class="min-w-0 flex-1">
+                            <p class="font-medium text-slate-800 text-sm">Trainer Management</p>
+                            <p class="text-xs text-slate-500">Manage trainer accounts</p>
+                        </div>
+                        <span class="material-symbols-outlined text-slate-400">chevron_right</span>
+                    </a>
+                    {% endif %}
+                    
+                    <a href="{{ url_for('issue_return') }}" class="flex items-center gap-3 p-3 border border-slate-200 rounded-lg hover:bg-slate-50">
+                        <span class="material-symbols-outlined text-green-600 text-xl">compare_arrows</span>
+                        <div class="min-w-0 flex-1">
+                            <p class="font-medium text-slate-800 text-sm">Issue & Return</p>
+                            <p class="text-xs text-slate-500">Manage component transactions</p>
+                        </div>
+                        <span class="material-symbols-outlined text-slate-400">chevron_right</span>
+                    </a>
+                    
+                    <a href="{{ url_for('reports') }}" class="flex items-center gap-3 p-3 border border-slate-200 rounded-lg hover:bg-slate-50">
+                        <span class="material-symbols-outlined text-orange-600 text-xl">assessment</span>
+                        <div class="min-w-0 flex-1">
+                            <p class="font-medium text-slate-800 text-sm">Usage Analytics</p>
+                            <p class="text-xs text-slate-500">View reports & insights</p>
+                        </div>
+                        <span class="material-symbols-outlined text-slate-400">chevron_right</span>
+                    </a>
+                </div>
+            </div>
+            
+            <!-- User Info -->
+            <div class="mt-6 bg-white rounded-xl border border-slate-200 p-4 lg:p-6">
+                <h2 class="text-lg lg:text-xl font-bold leading-tight tracking-[-0.015em] mb-4">User Information</h2>
+                <div class="space-y-3">
+                    <div class="flex justify-between items-center">
+                        <span class="text-sm text-slate-600">Role</span>
+                        <span class="text-sm font-medium text-slate-800 capitalize">{{ user_role }}</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-sm text-slate-600">Username</span>
+                        <span class="text-sm font-medium text-slate-800">{{ session.username }}</span>
+                    </div>
+                    {% if user_role == 'trainer' and lab_name %}
+                    <div class="flex justify-between items-center">
+                        <span class="text-sm text-slate-600">Assigned Lab</span>
+                        <span class="text-sm font-medium text-slate-800">{{ lab_name }}</span>
+                    </div>
+                    {% endif %}
+                    <div class="flex justify-between items-center">
+                        <span class="text-sm text-slate-600">Current Time</span>
+                        <span class="text-sm font-medium text-slate-800">{{ now.strftime('%H:%M') }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Refresh dashboard stats every 30 seconds
+setInterval(async () => {
+    try {
+        const response = await fetch('/api/dashboard/stats');
+        if (response.ok) {
+            const stats = await response.json();
+            // Update the stats on the page
+            {% if user_role == 'admin' %}
+            const totalLabsElement = document.querySelector('p:contains("Total Labs")');
+            const totalComponentsElement = document.querySelector('p:contains("Total Components")');
+            const totalTrainersElement = document.querySelector('p:contains("Total Trainers")');
+            
+            if (totalLabsElement) totalLabsElement.nextElementSibling.textContent = stats.total_labs;
+            if (totalComponentsElement) totalComponentsElement.nextElementSibling.textContent = stats.total_components;
+            if (totalTrainersElement) totalTrainersElement.nextElementSibling.textContent = stats.total_trainers;
+            {% else %}
+            const myComponentsElement = document.querySelector('p:contains("My Components")');
+            if (myComponentsElement) myComponentsElement.nextElementSibling.textContent = stats.total_components;
+            {% endif %}
+            
+            const issuedTodayElement = document.querySelector('p:contains("Issued Today")');
+            const pendingReturnsElement = document.querySelector('p:contains("Pending Returns")');
+            const lowStockElement = document.querySelector('p:contains("Low Stock")');
+            
+            if (issuedTodayElement) issuedTodayElement.nextElementSibling.textContent = stats.issued_today;
+            if (pendingReturnsElement) pendingReturnsElement.nextElementSibling.textContent = stats.pending_returns;
+            if (lowStockElement) lowStockElement.nextElementSibling.textContent = stats.low_stock;
+            
+            {% if user_role == 'admin' %}
+            const overdueElement = document.querySelector('p:contains("Overdue Items")');
+            if (overdueElement) overdueElement.nextElementSibling.textContent = stats.overdue_count;
+            {% endif %}
+        }
+    } catch (error) {
+        console.error('Error fetching dashboard stats:', error);
+    }
+}, 30000);
+</script>
+{% endblock %}

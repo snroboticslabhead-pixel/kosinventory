@@ -1,0 +1,84 @@
+<aside class="flex h-full flex-col border-r border-slate-200 bg-white">
+    <!-- Desktop Logo -->
+    <div class="hidden lg:flex h-16 items-center justify-center px-6 text-primary border-b border-slate-200">
+        <img src="https://i.ibb.co/PsGBGqCR/image-removebg-preview-34-1.png" alt="Lab Inventory Logo" class="h-14 w-auto">
+    </div>
+    
+    <!-- Mobile Sidebar Header -->
+    <div class="lg:hidden flex items-center justify-between p-4 border-b border-slate-200">
+        <div class="flex items-center gap-3">
+            <img src="https://i.ibb.co/PsGBGqCR/image-removebg-preview-34-1.png" alt="Lab Inventory Logo" class="h-10 w-auto">
+            <!-- Text removed for mobile as requested -->
+        </div>
+        <button onclick="toggleMobileSidebar()" class="p-2 rounded-lg hover:bg-slate-100">
+            <span class="material-symbols-outlined text-slate-600">close</span>
+        </button>
+    </div>
+
+    <div class="flex flex-1 flex-col justify-between p-4 overflow-y-auto">
+        <div class="flex flex-col gap-2">
+            <a class="flex items-center gap-3 rounded-lg px-3 py-2 text-slate-600 hover:bg-slate-100 {% if request.endpoint == 'dashboard' %}bg-primary/10 text-primary{% endif %}" href="{{ url_for('dashboard') }}" onclick="closeMobileSidebar()">
+                <span class="material-symbols-outlined">dashboard</span>
+                <p class="text-sm font-medium leading-normal">Dashboard</p>
+            </a>
+            
+            <!-- Admin Only Menu Items -->
+            {% if session.role == 'admin' %}
+            <a class="flex items-center gap-3 rounded-lg px-3 py-2 text-slate-600 hover:bg-slate-100 {% if request.endpoint == 'trainers' %}bg-primary/10 text-primary{% endif %}" href="{{ url_for('trainers') }}" onclick="closeMobileSidebar()">
+                <span class="material-symbols-outlined">supervisor_account</span>
+                <p class="text-sm font-medium leading-normal">Trainer Management</p>
+            </a>
+            <a class="flex items-center gap-3 rounded-lg px-3 py-2 text-slate-600 hover:bg-slate-100 {% if request.endpoint == 'labs' %}bg-primary/10 text-primary{% endif %}" href="{{ url_for('labs') }}" onclick="closeMobileSidebar()">
+                <span class="material-symbols-outlined">science</span>
+                <p class="text-sm font-medium leading-normal">Labs</p>
+            </a>
+            {% endif %}
+            
+            <!-- Shared Menu Items -->
+            <a class="flex items-center gap-3 rounded-lg px-3 py-2 text-slate-600 hover:bg-slate-100 {% if request.endpoint == 'components' %}bg-primary/10 text-primary{% endif %}" href="{{ url_for('components') }}" onclick="closeMobileSidebar()">
+                <span class="material-symbols-outlined">inventory_2</span>
+                <p class="text-sm font-medium leading-normal">Components</p>
+            </a>
+            <a class="flex items-center gap-3 rounded-lg px-3 py-2 text-slate-600 hover:bg-slate-100 {% if request.endpoint == 'component_groups' %}bg-primary/10 text-primary{% endif %}" href="{{ url_for('component_groups') }}" onclick="closeMobileSidebar()">
+                <span class="material-symbols-outlined">category</span>
+                <p class="text-sm font-medium leading-normal">Component Groups</p>
+            </a>
+            <a class="flex items-center gap-3 rounded-lg px-3 py-2 text-slate-600 hover:bg-slate-100 {% if request.endpoint == 'issue_return' %}bg-primary/10 text-primary{% endif %}" href="{{ url_for('issue_return') }}" onclick="closeMobileSidebar()">
+                <span class="material-symbols-outlined">compare_arrows</span>
+                <p class="text-sm font-medium leading-normal">Issue & Return</p>
+            </a>
+            
+            <!-- Tracking Menu Items -->
+            <a class="flex items-center gap-3 rounded-lg px-3 py-2 text-slate-600 hover:bg-slate-100 {% if request.endpoint == 'overdue_items' %}bg-primary/10 text-primary{% endif %}" href="{{ url_for('overdue_items') }}" onclick="closeMobileSidebar()">
+                <span class="material-symbols-outlined">warning</span>
+                <p class="text-sm font-medium leading-normal">Overdue Items</p>
+            </a>
+            <a class="flex items-center gap-3 rounded-lg px-3 py-2 text-slate-600 hover:bg-slate-100 {% if request.endpoint == 'reports' %}bg-primary/10 text-primary{% endif %}" href="{{ url_for('reports') }}" onclick="closeMobileSidebar()">
+                <span class="material-symbols-outlined">assessment</span>
+                <p class="text-sm font-medium leading-normal">Reports & Analytics</p>
+            </a>
+        </div>
+        <div class="flex flex-col gap-4">
+            <a class="flex items-center gap-3 px-3 py-2 text-slate-600 hover:bg-slate-100 rounded-lg cursor-pointer" href="{{ url_for('logout') }}" onclick="closeMobileSidebar()">
+                <span class="material-symbols-outlined">logout</span>
+                <p class="text-sm font-medium leading-normal">Logout</p>
+            </a>
+            <div class="flex gap-3 border-t border-slate-200 pt-4">
+                <div class="bg-slate-200 rounded-full size-10 flex items-center justify-center">
+                    <span class="material-symbols-outlined text-slate-600">person</span>
+                </div>
+                <div class="flex flex-col">
+                    <h1 class="text-slate-800 text-sm font-medium leading-normal">
+                        {% if session.username %}{{ session.username }}{% else %}User{% endif %}
+                    </h1>
+                    <p class="text-slate-500 text-xs font-normal leading-normal">
+                        {% if session.role %}{{ session.role|title }}{% else %}User{% endif %}
+                        {% if session.role == 'trainer' and session.lab_name %}
+                        • {{ session.lab_name }}
+                        {% endif %}
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</aside>

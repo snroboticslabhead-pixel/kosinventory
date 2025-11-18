@@ -1,0 +1,143 @@
+{% extends "layout.html" %}
+
+{% block title %}Activity Log - Lab Inventory System{% endblock %}
+{% block page_title %}Activity Log{% endblock %}
+
+{% block content %}
+<div class="w-full max-w-7xl mx-auto flex flex-col gap-6">
+    <!-- PageHeading -->
+    <div class="flex flex-wrap justify-between gap-3 items-center">
+        <div class="flex flex-col gap-1">
+            <p class="text-slate-900 dark:text-white text-3xl font-bold tracking-tight">Activity Log</p>
+            <p class="text-slate-500 dark:text-slate-400 text-base font-normal">Track all operations and actions within the inventory system.</p>
+        </div>
+    </div>
+
+    <!-- Filters & Search Bar -->
+    <div class="flex flex-col gap-4">
+        <!-- SearchBar -->
+        <div class="w-full">
+            <label class="flex flex-col w-full">
+                <div class="flex w-full flex-1 items-stretch rounded-lg h-12 bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700">
+                    <div class="text-slate-400 dark:text-slate-500 flex items-center justify-center pl-4">
+                        <span class="material-symbols-outlined">search</span>
+                    </div>
+                    <input type="text" class="form-input flex w-full min-w-0 flex-1 resize-none overflow-hidden text-slate-900 dark:text-slate-100 focus:outline-0 focus:ring-0 border-none bg-transparent h-full placeholder:text-slate-400 dark:placeholder:text-slate-500 px-2 text-base font-normal" 
+                           placeholder="Search logs by user, action, or component..." value="{{ search }}"
+                           onkeypress="if(event.key === 'Enter') searchLogs(this.value)">
+                </div>
+            </label>
+        </div>
+
+        <!-- Chips -->
+        <div class="flex flex-wrap gap-2">
+            <button class="flex h-9 shrink-0 items-center justify-center gap-x-2 rounded-lg bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 px-3">
+                <p class="text-slate-700 dark:text-slate-300 text-sm font-medium">Lab</p>
+                <span class="material-symbols-outlined text-slate-400 dark:text-slate-500 text-base">expand_more</span>
+            </button>
+            <button class="flex h-9 shrink-0 items-center justify-center gap-x-2 rounded-lg bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 px-3">
+                <p class="text-slate-700 dark:text-slate-300 text-sm font-medium">Component</p>
+                <span class="material-symbols-outlined text-slate-400 dark:text-slate-500 text-base">expand_more</span>
+            </button>
+            <button class="flex h-9 shrink-0 items-center justify-center gap-x-2 rounded-lg bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 px-3">
+                <p class="text-slate-700 dark:text-slate-300 text-sm font-medium">User</p>
+                <span class="material-symbols-outlined text-slate-400 dark:text-slate-500 text-base">expand_more</span>
+            </button>
+            <button class="flex h-9 shrink-0 items-center justify-center gap-x-2 rounded-lg bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 px-3">
+                <p class="text-slate-700 dark:text-slate-300 text-sm font-medium">Action</p>
+                <span class="material-symbols-outlined text-slate-400 dark:text-slate-500 text-base">expand_more</span>
+            </button>
+            <button class="flex h-9 shrink-0 items-center justify-center gap-x-2 rounded-lg bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 px-3">
+                <p class="text-slate-700 dark:text-slate-300 text-sm font-medium">Date Range</p>
+                <span class="material-symbols-outlined text-slate-400 dark:text-slate-500 text-base">expand_more</span>
+            </button>
+            <button class="ml-auto flex h-9 shrink-0 items-center justify-center gap-x-2 rounded-lg bg-transparent px-3 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200">
+                <p class="text-sm font-medium">Clear All</p>
+            </button>
+        </div>
+    </div>
+
+    <!-- Table -->
+    <div class="overflow-hidden rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/50">
+        <div class="overflow-x-auto">
+            <table class="w-full">
+                <thead class="bg-slate-50 dark:bg-slate-800/50">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                            <div class="flex items-center gap-1 cursor-pointer">Timestamp <span class="material-symbols-outlined text-base">unfold_more</span></div>
+                        </th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                            <div class="flex items-center gap-1 cursor-pointer">User <span class="material-symbols-outlined text-base">unfold_more</span></div>
+                        </th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Action Type</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Target Item</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Details</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-200 dark:divide-slate-800">
+                    {% for log in logs %}
+                    <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-500 dark:text-slate-400">
+                            {{ log.timestamp.strftime('%Y-%m-%d %H:%M') }}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-900 dark:text-slate-100">
+                            {{ log.user_name }}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm">
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium 
+                                {% if log.action_type == 'create' %}bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-300
+                                {% elif log.action_type == 'update' %}bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-300
+                                {% elif log.action_type == 'delete' %}bg-red-100 dark:bg-red-900/50 text-red-800 dark:text-red-300
+                                {% elif log.action_type == 'issue' %}bg-purple-100 dark:bg-purple-900/50 text-purple-800 dark:text-purple-300
+                                {% elif log.action_type == 'return' %}bg-yellow-100 dark:bg-yellow-900/50 text-yellow-800 dark:text-yellow-300
+                                {% else %}bg-gray-100 dark:bg-gray-900/50 text-gray-800 dark:text-gray-300{% endif %}">
+                                {{ log.action_type|title }}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-500 dark:text-slate-400">
+                            {{ log.target_type|title }}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-500 dark:text-slate-400">
+                            {{ log.details }}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Pagination -->
+    <nav aria-label="Pagination" class="flex items-center justify-between py-3">
+        <div class="hidden sm:block">
+            <p class="text-sm text-slate-500 dark:text-slate-400">
+                Showing
+                <span class="font-medium text-slate-700 dark:text-slate-200">1</span>
+                to
+                <span class="font-medium text-slate-700 dark:text-slate-200">{{ logs|length }}</span>
+                of
+                <span class="font-medium text-slate-700 dark:text-slate-200">42</span>
+                results
+            </p>
+        </div>
+        <div class="flex-1 flex justify-between sm:justify-end gap-2">
+            <a href="?page={{ page-1 if page > 1 else 1 }}&search={{ search }}" 
+               class="relative inline-flex items-center px-4 py-2 border border-slate-300 dark:border-slate-700 text-sm font-medium rounded-md text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700">
+                Previous
+            </a>
+            <a href="?page={{ page+1 }}&search={{ search }}" 
+               class="relative inline-flex items-center px-4 py-2 border border-slate-300 dark:border-slate-700 text-sm font-medium rounded-md text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700">
+                Next
+            </a>
+        </div>
+    </nav>
+</div>
+
+<script>
+function searchLogs(query) {
+    const url = new URL(window.location);
+    url.searchParams.set('search', query);
+    window.location.href = url.toString();
+}
+</script>
+{% endblock %}

@@ -1,0 +1,492 @@
+{% extends "base.html" %}
+
+{% block title %}Trainer Management - Lab Inventory System{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto">
+    <!-- Flash Messages -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="flash-message mb-4 lg:mb-6 p-4 rounded-lg {% if category == 'error' %}bg-red-100 text-red-700{% else %}bg-green-100 text-green-700{% endif %}">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <!-- Page Header with Actions -->
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 lg:mb-8">
+        <div class="flex flex-col">
+            <h1 class="text-2xl lg:text-3xl font-bold leading-tight tracking-tight text-slate-800">Trainer Management</h1>
+            <p class="text-sm lg:text-base font-normal leading-normal text-slate-500">Create and manage trainer accounts with lab assignments.</p>
+        </div>
+        <button onclick="openTrainerModal()" class="flex w-full sm:w-auto min-w-[84px] max-w-[480px] cursor-pointer items-center justify-center overflow-hidden rounded-lg h-12 px-5 bg-primary text-white gap-2 pl-4 text-base font-bold shadow-sm hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:ring-offset-2">
+            <span class="material-symbols-outlined text-2xl">add</span>
+            <span class="truncate">Add New Trainer</span>
+        </button>
+    </div>
+
+    <!-- Search and Filters -->
+    <div class="flex flex-col md:flex-row justify-between items-center gap-4 mb-4">
+        <div class="flex-1 w-full">
+            <label class="relative">
+                <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-500">search</span>
+                <input class="form-input flex w-full min-w-0 flex-1 resize-none overflow-hidden rounded-lg text-slate-800 border-slate-200 focus:ring-primary focus:border-primary bg-white h-10 placeholder:text-slate-500 pl-10 pr-4 text-sm font-normal leading-normal" placeholder="Search trainers..." type="text" id="searchInput" onkeyup="searchTrainers()"/>
+            </label>
+        </div>
+        <div class="flex items-center gap-2 w-full md:w-auto">
+            <select class="form-select w-full md:w-auto rounded-lg border-slate-200 bg-white text-sm focus:border-primary focus:ring-primary/50" id="labFilter" onchange="filterTrainers()">
+                <option value="all">Lab: All</option>
+                {% for lab in labs %}
+                <option value="{{ lab.name }}">{{ lab.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+    </div>
+
+    <!-- Mobile Cards View -->
+    <div class="block lg:hidden space-y-4">
+        {% for trainer in trainers %}
+        <div class="bg-white rounded-xl border border-slate-200 p-4">
+            <div class="flex justify-between items-start mb-3">
+                <div class="flex-1 min-w-0">
+                    <h3 class="font-semibold text-slate-800 truncate">{{ trainer.username }}</h3>
+                    <p class="text-sm text-slate-600">{{ trainer.email }}</p>
+                    <p class="text-sm text-slate-600">Lab: {{ trainer.lab_name or 'Not assigned' }}</p>
+                </div>
+                <div class="flex gap-1 ml-2">
+                    <button onclick="editTrainer('{{ trainer._id }}')" class="p-1.5 rounded-md hover:bg-slate-100 text-slate-500 hover:text-primary">
+                        <span class="material-symbols-outlined text-xl">edit</span>
+                    </button>
+                    <button onclick="deleteTrainer('{{ trainer._id }}')" class="p-1.5 rounded-md hover:bg-slate-100 text-slate-500 hover:text-red-500">
+                        <span class="material-symbols-outlined text-xl">delete</span>
+                    </button>
+                </div>
+            </div>
+            <div class="text-xs text-slate-500">
+                Created: {{ trainer.created_at.strftime('%Y-%m-%d') if trainer.created_at else 'N/A' }}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Desktop Table View -->
+    <div class="hidden lg:block bg-white rounded-xl border border-slate-200 overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm text-left">
+                <thead class="text-xs text-slate-500 uppercase bg-slate-50">
+                    <tr>
+                        <th class="px-6 py-3" scope="col">Username</th>
+                        <th class="px-6 py-3" scope="col">Email</th>
+                        <th class="px-6 py-3" scope="col">Assigned Lab</th>
+                        <th class="px-6 py-3" scope="col">Created</th>
+                        <th class="px-6 py-3 text-right" scope="col">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="trainersTableBody">
+                    {% for trainer in trainers %}
+                    <tr class="border-b border-slate-200 hover:bg-slate-50/50">
+                        <td class="px-6 py-4 font-medium text-slate-800">{{ trainer.username }}</td>
+                        <td class="px-6 py-4 text-slate-600">{{ trainer.email }}</td>
+                        <td class="px-6 py-4 text-slate-600">{{ trainer.lab_name or 'Not assigned' }}</td>
+                        <td class="px-6 py-4 text-slate-600">
+                            {{ trainer.created_at.strftime('%Y-%m-%d') if trainer.created_at else 'N/A' }}
+                        </td>
+                        <td class="px-6 py-4 text-right">
+                            <div class="flex justify-end gap-2">
+                                <button onclick="editTrainer('{{ trainer._id }}')" class="p-1.5 rounded-md hover:bg-slate-100 text-slate-500 hover:text-primary">
+                                    <span class="material-symbols-outlined text-xl">edit</span>
+                                </button>
+                                <button onclick="deleteTrainer('{{ trainer._id }}')" class="p-1.5 rounded-md hover:bg-slate-100 text-slate-500 hover:text-red-500">
+                                    <span class="material-symbols-outlined text-xl">delete</span>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        
+        <!-- Pagination -->
+        {% if trainers|length > 10 %}
+        <div class="flex flex-col sm:flex-row justify-between items-center border-t border-slate-200 p-4 gap-4">
+            <span class="text-sm text-slate-600">Showing {{ trainers|length }} trainers</span>
+            <div class="flex items-center gap-2">
+                <button class="flex h-9 w-9 cursor-pointer items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed">
+                    <span class="material-symbols-outlined">chevron_left</span>
+                </button>
+                <button class="flex h-9 w-9 cursor-pointer items-center justify-center overflow-hidden rounded-lg border border-primary bg-primary text-white">
+                    1
+                </button>
+                <button class="flex h-9 w-9 cursor-pointer items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50">
+                    <span class="material-symbols-outlined">chevron_right</span>
+                </button>
+            </div>
+        </div>
+        {% else %}
+        <div class="border-t border-slate-200 p-4">
+            <span class="text-sm text-slate-600">Showing {{ trainers|length }} trainers</span>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Empty State -->
+    {% if not trainers %}
+    <div class="text-center py-12">
+        <div class="mx-auto w-24 h-24 bg-slate-100 rounded-full flex items-center justify-center mb-4">
+            <span class="material-symbols-outlined text-slate-400 text-4xl">person</span>
+        </div>
+        <h3 class="text-lg font-medium text-slate-900 mb-2">No trainers found</h3>
+        <p class="text-slate-500 mb-6">Get started by creating your first trainer account.</p>
+        <button onclick="openTrainerModal()" class="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-primary/90">
+            <span class="material-symbols-outlined mr-2">add</span>
+            Add New Trainer
+        </button>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Add/Edit Trainer Modal -->
+<div id="trainerModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 hidden">
+    <div class="w-full max-w-md rounded-xl bg-white shadow-xl max-h-[90vh] overflow-y-auto">
+        <div class="flex items-center justify-between border-b border-slate-200 p-6 sticky top-0 bg-white">
+            <h3 class="text-xl font-bold text-slate-900" id="modalTitle">Add New Trainer</h3>
+            <button onclick="closeTrainerModal()" class="text-slate-500 hover:text-slate-800">
+                <span class="material-symbols-outlined">close</span>
+            </button>
+        </div>
+        <form id="trainerForm" class="flex flex-col gap-6 p-6">
+            <input type="hidden" id="trainerId">
+            <div>
+                <label class="mb-1.5 block text-sm font-medium text-slate-700" for="username">Username</label>
+                <input class="form-input w-full rounded-lg border-slate-200 bg-white text-slate-900 placeholder:text-slate-400 focus:border-primary focus:ring-2 focus:ring-primary/20" id="username" placeholder="e.g., trainer_john" type="text" required/>
+            </div>
+            <div>
+                <label class="mb-1.5 block text-sm font-medium text-slate-700" for="email">Email</label>
+                <input class="form-input w-full rounded-lg border-slate-200 bg-white text-slate-900 placeholder:text-slate-400 focus:border-primary focus:ring-2 focus:ring-primary/20" id="email" placeholder="e.g., trainer@lab.com" type="email" required/>
+            </div>
+            <div>
+                <label class="mb-1.5 block text-sm font-medium text-slate-700" for="password">Password</label>
+                <input class="form-input w-full rounded-lg border-slate-200 bg-white text-slate-900 placeholder:text-slate-400 focus:border-primary focus:ring-2 focus:ring-primary/20" id="password" placeholder="Enter password" type="password"/>
+                <p class="text-xs text-slate-500 mt-1" id="passwordHelp">Leave blank to keep current password</p>
+            </div>
+            <div>
+                <label class="mb-1.5 block text-sm font-medium text-slate-700" for="lab">Assign Lab</label>
+                <select class="form-select w-full rounded-lg border-slate-200 bg-white text-slate-900 focus:border-primary focus:ring-2 focus:ring-primary/20" id="lab" required>
+                    <option value="">Select Lab</option>
+                    {% for lab in labs %}
+                    <option value="{{ lab._id }}">{{ lab.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </form>
+        <div class="flex justify-end gap-4 border-t border-slate-200 p-6 sticky bottom-0 bg-white">
+            <button onclick="closeTrainerModal()" class="h-11 rounded-lg px-5 text-sm font-bold bg-slate-100 text-slate-800 hover:bg-slate-200">Cancel</button>
+            <button onclick="saveTrainer()" class="h-11 rounded-lg bg-primary px-5 text-sm font-bold text-white hover:bg-primary/90">Save Trainer</button>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div id="deleteModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 hidden">
+    <div class="w-full max-w-md rounded-xl bg-white shadow-xl">
+        <div class="flex items-center justify-between border-b border-slate-200 p-6">
+            <h3 class="text-xl font-bold text-slate-900">Delete Trainer</h3>
+            <button onclick="closeDeleteModal()" class="text-slate-500 hover:text-slate-800">
+                <span class="material-symbols-outlined">close</span>
+            </button>
+        </div>
+        <div class="p-6">
+            <div class="flex items-center gap-4 mb-4">
+                <div class="flex h-12 w-12 items-center justify-center rounded-full bg-red-100">
+                    <span class="material-symbols-outlined text-red-600">warning</span>
+                </div>
+                <div>
+                    <h4 class="text-lg font-semibold text-slate-900">Confirm Deletion</h4>
+                    <p class="text-slate-600">Are you sure you want to delete this trainer? This action cannot be undone.</p>
+                </div>
+            </div>
+        </div>
+        <div class="flex justify-end gap-4 border-t border-slate-200 p-6">
+            <button onclick="closeDeleteModal()" class="h-11 rounded-lg px-5 text-sm font-bold bg-slate-100 text-slate-800 hover:bg-slate-200">Cancel</button>
+            <button onclick="confirmDeleteTrainer()" class="h-11 rounded-lg bg-red-600 px-5 text-sm font-bold text-white hover:bg-red-700">Delete Trainer</button>
+        </div>
+    </div>
+</div>
+
+<script>
+let currentEditingTrainerId = null;
+let trainerToDelete = null;
+
+// Search functionality
+function searchTrainers() {
+    const input = document.getElementById('searchInput').value.toLowerCase();
+    const rows = document.querySelectorAll('#trainersTableBody tr');
+    const mobileCards = document.querySelectorAll('.block.lg\\:hidden > div');
+    let visibleCount = 0;
+
+    // Desktop table
+    rows.forEach(row => {
+        const cells = row.getElementsByTagName('td');
+        let found = false;
+        
+        for (let j = 0; j < cells.length; j++) {
+            if (cells[j].textContent.toLowerCase().includes(input)) {
+                found = true;
+                break;
+            }
+        }
+        
+        if (found) {
+            row.style.display = '';
+            visibleCount++;
+        } else {
+            row.style.display = 'none';
+        }
+    });
+
+    // Mobile cards
+    mobileCards.forEach(card => {
+        const text = card.textContent.toLowerCase();
+        if (text.includes(input)) {
+            card.style.display = 'block';
+            visibleCount++;
+        } else {
+            card.style.display = 'none';
+        }
+    });
+
+    // Update count display
+    const countElement = document.querySelector('.text-sm.text-slate-600');
+    if (countElement) {
+        countElement.textContent = `Showing ${visibleCount} trainers`;
+    }
+}
+
+// Filter functionality
+function filterTrainers() {
+    const labFilter = document.getElementById('labFilter').value;
+    const rows = document.querySelectorAll('#trainersTableBody tr');
+    const mobileCards = document.querySelectorAll('.block.lg\\:hidden > div');
+    let visibleCount = 0;
+
+    // Desktop table
+    rows.forEach(row => {
+        const labCell = row.querySelector('td:nth-child(3)');
+        if (labCell) {
+            const labMatch = labFilter === 'all' || labCell.textContent === labFilter;
+            if (labMatch) {
+                row.style.display = '';
+                visibleCount++;
+            } else {
+                row.style.display = 'none';
+            }
+        }
+    });
+
+    // Mobile cards
+    mobileCards.forEach(card => {
+        const labElement = card.querySelector('p:nth-child(3)');
+        if (labElement) {
+            const labText = labElement.textContent.replace('Lab: ', '');
+            const labMatch = labFilter === 'all' || labText === labFilter;
+            if (labMatch) {
+                card.style.display = 'block';
+                visibleCount++;
+            } else {
+                card.style.display = 'none';
+            }
+        }
+    });
+
+    // Update count display
+    const countElement = document.querySelector('.text-sm.text-slate-600');
+    if (countElement) {
+        countElement.textContent = `Showing ${visibleCount} trainers`;
+    }
+}
+
+// Modal functions
+function openTrainerModal(trainerId = null) {
+    currentEditingTrainerId = trainerId;
+    const modal = document.getElementById('trainerModal');
+    const title = document.getElementById('modalTitle');
+    const passwordHelp = document.getElementById('passwordHelp');
+    
+    if (trainerId) {
+        title.textContent = 'Edit Trainer';
+        passwordHelp.textContent = 'Leave blank to keep current password';
+        fetchTrainerData(trainerId);
+    } else {
+        title.textContent = 'Add New Trainer';
+        passwordHelp.textContent = 'Enter password for new trainer';
+        document.getElementById('trainerForm').reset();
+        document.getElementById('password').required = true;
+    }
+    
+    modal.classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+}
+
+function closeTrainerModal() {
+    document.getElementById('trainerModal').classList.add('hidden');
+    document.getElementById('trainerForm').reset();
+    currentEditingTrainerId = null;
+    document.body.style.overflow = 'auto';
+}
+
+function openDeleteModal(trainerId) {
+    trainerToDelete = trainerId;
+    document.getElementById('deleteModal').classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+}
+
+function closeDeleteModal() {
+    document.getElementById('deleteModal').classList.add('hidden');
+    trainerToDelete = null;
+    document.body.style.overflow = 'auto';
+}
+
+async function fetchTrainerData(trainerId) {
+    try {
+        const response = await fetch(`/api/trainers/${trainerId}`);
+        if (response.ok) {
+            const trainer = await response.json();
+            document.getElementById('username').value = trainer.username;
+            document.getElementById('email').value = trainer.email;
+            document.getElementById('lab').value = trainer.lab_id || '';
+            document.getElementById('password').required = false;
+        } else {
+            alert('Error fetching trainer data');
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert('Error fetching trainer data');
+    }
+}
+
+async function saveTrainer() {
+    const formData = {
+        username: document.getElementById('username').value,
+        email: document.getElementById('email').value,
+        lab_id: document.getElementById('lab').value
+    };
+
+    // Only include password if provided (for new trainers or when changing password)
+    const password = document.getElementById('password').value;
+    if (password) {
+        formData.password = password;
+    }
+
+    // Validation
+    if (!formData.username || !formData.email || !formData.lab_id) {
+        alert('Please fill in all required fields');
+        return;
+    }
+
+    // For new trainers, password is required
+    if (!currentEditingTrainerId && !password) {
+        alert('Please enter a password for the new trainer');
+        return;
+    }
+
+    try {
+        let response;
+        if (currentEditingTrainerId) {
+            response = await fetch(`/api/trainers/${currentEditingTrainerId}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(formData)
+            });
+        } else {
+            response = await fetch('/api/trainers', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(formData)
+            });
+        }
+
+        if (response.ok) {
+            closeTrainerModal();
+            location.reload();
+        } else {
+            const error = await response.json();
+            alert(error.error || 'Error saving trainer');
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert('Error saving trainer');
+    }
+}
+
+function editTrainer(trainerId) {
+    openTrainerModal(trainerId);
+}
+
+function deleteTrainer(trainerId) {
+    openDeleteModal(trainerId);
+}
+
+async function confirmDeleteTrainer() {
+    if (!trainerToDelete) return;
+
+    try {
+        const response = await fetch(`/api/trainers/${trainerToDelete}`, {
+            method: 'DELETE'
+        });
+
+        if (response.ok) {
+            closeDeleteModal();
+            location.reload();
+        } else {
+            const error = await response.json();
+            alert(error.error || 'Error deleting trainer');
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert('Error deleting trainer');
+    }
+}
+
+// Close modals when clicking outside
+document.getElementById('trainerModal').addEventListener('click', function(e) {
+    if (e.target === this) {
+        closeTrainerModal();
+    }
+});
+
+document.getElementById('deleteModal').addEventListener('click', function(e) {
+    if (e.target === this) {
+        closeDeleteModal();
+    }
+});
+
+// Close modals with Escape key
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        closeTrainerModal();
+        closeDeleteModal();
+    }
+});
+
+// Initialize search and filter
+document.addEventListener('DOMContentLoaded', function() {
+    // Add event listeners for real-time search
+    const searchInput = document.getElementById('searchInput');
+    if (searchInput) {
+        searchInput.addEventListener('input', searchTrainers);
+    }
+    
+    const labFilter = document.getElementById('labFilter');
+    if (labFilter) {
+        labFilter.addEventListener('change', filterTrainers);
+    }
+});
+</script>
+{% endblock %}
