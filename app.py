@@ -93,7 +93,7 @@ def find_or_create_group(group_name, lab_id, lab_name, existing_groups):
     group_id = ComponentGroup.create(group_data)
     return group_id
 
-# UID Generation functions
+# UID Generation functions - FIXED VERSION
 def generate_component_uid(lab_id, component_name, existing_components):
     """Generate unique UID for component based on lab and component type"""
     # Get lab details
@@ -110,35 +110,32 @@ def generate_component_uid(lab_id, component_name, existing_components):
         # Fallback: use first 2 letters of lab name
         lab_code = lab['name'][:2].upper()
     
-    # Get component type code (first 3 letters of category or name)
-    component_code = component_name[:3].upper()
+    # Get existing UIDs to avoid duplicates
+    existing_uids = set()
+    for comp in existing_components:
+        if comp.get('uid'):
+            existing_uids.add(comp['uid'])
     
-    # Find existing components with same lab and component type to determine sequence
-    similar_components = [c for c in existing_components 
-                         if c.get('lab_id') == lab_id 
-                         and c['name'].startswith(component_name[:5])]
-    
-    sequence_number = len(similar_components) + 1
-    
-    # Generate UID: COML1-001, COML2-001, etc.
-    uid = f"COM{lab_code}-{sequence_number:03d}"
-    
-    # Ensure UID is unique
-    counter = 1
-    original_uid = uid
-    while any(c.get('uid') == uid for c in existing_components):
-        sequence_number += 1
+    # Find the next available sequence number
+    sequence_number = 1
+    while True:
         uid = f"COM{lab_code}-{sequence_number:03d}"
-        counter += 1
-        if counter > 100:  # Safety limit
+        if uid not in existing_uids:
+            return uid
+        sequence_number += 1
+        if sequence_number > 999:  # Safety limit
             break
     
-    return uid
+    # Fallback: use timestamp if all sequence numbers are taken
+    timestamp = int(datetime.utcnow().timestamp())
+    return f"COM{lab_code}-{timestamp}"
 
 def assign_uids_to_existing_components():
     """Assign UIDs to all existing components that don't have them"""
     existing_components = Component.get_all()
     components_without_uid = [c for c in existing_components if not c.get('uid')]
+    
+    print(f"Found {len(components_without_uid)} components without UIDs")
     
     for component in components_without_uid:
         uid = generate_component_uid(
@@ -147,14 +144,21 @@ def assign_uids_to_existing_components():
             existing_components
         )
         if uid:
-            Component.update(component['id'], {'uid': uid})
-            print(f"Assigned UID {uid} to component {component['name']}")
+            try:
+                Component.update(component['id'], {'uid': uid})
+                print(f"Assigned UID {uid} to component {component['name']}")
+                # Update our local list to avoid duplicates
+                component['uid'] = uid
+            except Exception as e:
+                print(f"Error assigning UID to component {component['name']}: {str(e)}")
 
-# Sample data initialization
+# Sample data initialization - FIXED VERSION
 def init_sample_data():
     with get_cursor() as cursor:
         cursor.execute('SELECT COUNT(*) as count FROM users')
-        if cursor.fetchone()['count'] == 0:
+        user_count = cursor.fetchone()['count']
+        
+        if user_count == 0:
             print("Initializing sample data...")
             
             # Create admin user
@@ -191,10 +195,8 @@ def init_sample_data():
                 }
             ]
             
-            lab_ids = []
             for lab_data in sample_labs:
-                lab_id = Lab.create(lab_data)
-                lab_ids.append(lab_id)
+                Lab.create(lab_data)
             
             labs = Lab.get_all()
             print(f"Created {len(labs)} labs")
@@ -237,19 +239,19 @@ def init_sample_data():
                 }
             ]
             
-            group_ids = []
+            group_map = {}
             for group_data in sample_groups:
                 group_id = ComponentGroup.create(group_data)
-                group_ids.append(group_id)
+                group_map[group_data['name']] = group_id
             
             groups = ComponentGroup.get_all()
-            group_map = {group['name']: group['id'] for group in groups}
             print("Created component groups")
             
-            # Create sample components for each lab
+            # Create sample components for each lab - WITH PRE-ASSIGNED UIDs
             sample_components = [
                 # Components for Robotics Lab A (LAB-001)
                 {
+                    'uid': 'COML1-001',
                     'name': 'Arduino Uno R3',
                     'category': 'Microcontrollers',
                     'lab': 'Robotics Lab A',
@@ -261,6 +263,7 @@ def init_sample_data():
                     'status': 'available'
                 },
                 {
+                    'uid': 'COML1-002',
                     'name': 'SG90 Micro Servo Motor',
                     'category': 'Actuators',
                     'lab': 'Robotics Lab A',
@@ -273,6 +276,7 @@ def init_sample_data():
                 },
                 # Components for IoT Prototyping Zone (LAB-002)
                 {
+                    'uid': 'COML2-001',
                     'name': 'Raspberry Pi 4',
                     'category': 'Microcontrollers',
                     'lab': 'IoT Prototyping Zone',
@@ -284,6 +288,7 @@ def init_sample_data():
                     'status': 'low_stock'
                 },
                 {
+                    'uid': 'COML2-002',
                     'name': 'HC-SR04 Ultrasonic Sensor',
                     'category': 'Sensors',
                     'lab': 'IoT Prototyping Zone',
@@ -295,6 +300,7 @@ def init_sample_data():
                     'status': 'available'
                 },
                 {
+                    'uid': 'COML2-003',
                     'name': 'DHT22 Temperature Sensor',
                     'category': 'Sensors',
                     'lab': 'IoT Prototyping Zone',
@@ -307,6 +313,7 @@ def init_sample_data():
                 },
                 # Components for Automation Hub (LAB-003) - No trainer assigned
                 {
+                    'uid': 'COML3-001',
                     'name': 'PLC Trainer Kit',
                     'category': 'Controllers',
                     'lab': 'Automation Hub',
@@ -319,11 +326,7 @@ def init_sample_data():
             
             for component_data in sample_components:
                 Component.create(component_data)
-            print("Created sample components")
-            
-            # Assign UIDs to existing components
-            assign_uids_to_existing_components()
-            print("Assigned UIDs to existing components")
+            print("Created sample components with pre-assigned UIDs")
             
             # Create sample transactions with pending_quantity field
             sample_transactions = [
@@ -363,6 +366,10 @@ def init_sample_data():
             print("Created sample transactions")
             
             print("Sample data initialization completed!")
+        else:
+            print("Sample data already exists, skipping initialization.")
+            # Still assign UIDs to any components that might be missing them
+            assign_uids_to_existing_components()
 
 # Role-based access control decorator
 def requires_role(roles):
@@ -1787,6 +1794,4 @@ def internal_error(error):
 if __name__ == '__main__':
     with app.app_context():
         init_sample_data()
-        # Assign UIDs to any existing components that don't have them
-        assign_uids_to_existing_components()
     app.run(debug=True, host='0.0.0.0', port=5000)
