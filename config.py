@@ -8,7 +8,7 @@ class Config:
     
     # MySQL configuration for PythonAnywhere
     MYSQL_HOST = os.environ.get('MYSQL_HOST') or 'labsdata.mysql.pythonanywhere-services.com'
-    MYSQL_USER = os.environ.get('MYSQL_USER') or 'inventorykos'
+    MYSQL_USER = os.environ.get('MYSQL_USER') or 'labsdata'
     MYSQL_PASSWORD = os.environ.get('MYSQL_PASSWORD') or 'Krishna@532'
     MYSQL_DB = os.environ.get('MYSQL_DB') or 'inventorykos$default'
     
@@ -26,4 +26,5 @@ config = {
     'production': ProductionConfig,
     'default': DevelopmentConfig
 }
+
 
