@@ -160,10 +160,11 @@ class Component:
     def create(data):
         with get_cursor() as cursor:
             cursor.execute('''
-                INSERT INTO components (name, category, lab, lab_id, group_id, group_name, 
+                INSERT INTO components (uid, name, category, lab, lab_id, group_id, group_name, 
                                       initial_quantity, current_quantity, status, created_at)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             ''', (
+                data.get('uid'),
                 data['name'],
                 data['category'],
                 data['lab'],
@@ -256,16 +257,20 @@ class Transaction:
     def create(data):
         with get_cursor() as cursor:
             cursor.execute('''
-                INSERT INTO transactions (component_name, lab, lab_id, issued_to, quantity_issued, 
-                                        quantity_returned, status, issue_date, return_date, purpose)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                INSERT INTO transactions (component_name, component_uid, lab, lab_id, issued_to, campus,
+                                        quantity_issued, quantity_returned, pending_quantity, status, 
+                                        issue_date, return_date, purpose)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             ''', (
                 data['component_name'],
+                data.get('component_uid', ''),
                 data['lab'],
                 data['lab_id'],
                 data['issued_to'],
+                data.get('campus', ''),
                 data['quantity_issued'],
                 data.get('quantity_returned', 0),
+                data.get('pending_quantity', data['quantity_issued']),
                 data.get('status', 'issued'),
                 data.get('issue_date', datetime.utcnow()),
                 data.get('return_date'),
