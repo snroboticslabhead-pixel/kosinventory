@@ -11,10 +11,11 @@ import csv
 from werkzeug.utils import secure_filename
 from functools import wraps
 import re
+import os
 from db import init_db, get_cursor
 
 app = Flask(__name__)
-app.config.from_object(config['development'])
+app.config.from_object(config['production'] if os.environ.get('PYTHONANYWHERE_SITE') else config['development'])
 
 # Initialize database
 with app.app_context():
@@ -1121,74 +1122,83 @@ def import_components():
 @app.route('/api/component-groups', methods=['POST'])
 @requires_role(['admin', 'trainer'])
 def create_component_group():
-    data = request.get_json()
-    
-    # For trainers, automatically assign their lab
-    if session.get('role') == 'trainer':
-        lab_id = session.get('lab_id')
-        lab_name = session.get('lab_name')
-        data['lab_id'] = lab_id
-        data['lab_name'] = lab_name
-    
-    group_data = {
-        'name': data['name'],
-        'description': data.get('description', ''),
-        'color': data.get('color', '#6B7280')
-    }
-    
-    # Add lab info if provided
-    if 'lab_id' in data:
-        group_data['lab_id'] = data['lab_id']
-        group_data['lab_name'] = data.get('lab_name', '')
-    
-    group_id = ComponentGroup.create(group_data)
-    return jsonify({'message': 'Component group created successfully', 'id': group_id}), 201
+    try:
+        data = request.get_json()
+        
+        # For trainers, automatically assign their lab
+        if session.get('role') == 'trainer':
+            lab_id = session.get('lab_id')
+            lab_name = session.get('lab_name')
+            data['lab_id'] = lab_id
+            data['lab_name'] = lab_name
+        
+        group_data = {
+            'name': data['name'],
+            'description': data.get('description', ''),
+            'color': data.get('color', '#6B7280')
+        }
+        
+        # Add lab info if provided
+        if 'lab_id' in data:
+            group_data['lab_id'] = data['lab_id']
+            group_data['lab_name'] = data.get('lab_name', '')
+        
+        group_id = ComponentGroup.create(group_data)
+        return jsonify({'message': 'Component group created successfully', 'id': group_id}), 201
+    except Exception as e:
+        return jsonify({'error': f'Error creating component group: {str(e)}'}), 500
 
 @app.route('/api/component-groups/<group_id>', methods=['PUT'])
 @requires_role(['admin', 'trainer'])
 def update_component_group(group_id):
-    data = request.get_json()
-    
-    # For trainers, verify they own this group
-    if session.get('role') == 'trainer':
-        with get_cursor() as cursor:
-            cursor.execute('SELECT * FROM component_groups WHERE id = %s', (group_id,))
-            group = cursor.fetchone()
-        if not group or (group.get('lab_id') and group['lab_id'] != session.get('lab_id')):
-            return jsonify({'error': 'Group not found or access denied'}), 404
-    
-    result = ComponentGroup.update(group_id, data)
-    
-    if result:
-        return jsonify({'message': 'Component group updated successfully'}), 200
-    else:
-        return jsonify({'error': 'Component group not found'}), 404
+    try:
+        data = request.get_json()
+        
+        # For trainers, verify they own this group
+        if session.get('role') == 'trainer':
+            with get_cursor() as cursor:
+                cursor.execute('SELECT * FROM component_groups WHERE id = %s', (group_id,))
+                group = cursor.fetchone()
+            if not group or (group.get('lab_id') and group['lab_id'] != session.get('lab_id')):
+                return jsonify({'error': 'Group not found or access denied'}), 404
+        
+        result = ComponentGroup.update(group_id, data)
+        
+        if result:
+            return jsonify({'message': 'Component group updated successfully'}), 200
+        else:
+            return jsonify({'error': 'Component group not found'}), 404
+    except Exception as e:
+        return jsonify({'error': f'Error updating component group: {str(e)}'}), 500
 
 @app.route('/api/component-groups/<group_id>', methods=['DELETE'])
 @requires_role(['admin', 'trainer'])
 def delete_component_group(group_id):
-    # Check if any components are using this group
-    with get_cursor() as cursor:
-        cursor.execute('SELECT COUNT(*) as count FROM components WHERE group_id = %s', (group_id,))
-        components_count = cursor.fetchone()['count']
-    
-    if components_count > 0:
-        return jsonify({'error': f'Cannot delete group. {components_count} components are using this group.'}), 400
-    
-    # For trainers, verify they own this group
-    if session.get('role') == 'trainer':
+    try:
+        # Check if any components are using this group
         with get_cursor() as cursor:
-            cursor.execute('SELECT * FROM component_groups WHERE id = %s', (group_id,))
-            group = cursor.fetchone()
-        if not group or (group.get('lab_id') and group['lab_id'] != session.get('lab_id')):
-            return jsonify({'error': 'Group not found or access denied'}), 404
-    
-    result = ComponentGroup.delete(group_id)
-    
-    if result:
-        return jsonify({'message': 'Component group deleted successfully'}), 200
-    else:
-        return jsonify({'error': 'Component group not found'}), 404
+            cursor.execute('SELECT COUNT(*) as count FROM components WHERE group_id = %s', (group_id,))
+            components_count = cursor.fetchone()['count']
+        
+        if components_count > 0:
+            return jsonify({'error': f'Cannot delete group. {components_count} components are using this group.'}), 400
+        
+        # For trainers, verify they own this group
+        if session.get('role') == 'trainer':
+            with get_cursor() as cursor:
+                cursor.execute('SELECT * FROM component_groups WHERE id = %s', (group_id,))
+                group = cursor.fetchone()
+            if not group or (group.get('lab_id') and group['lab_id'] != session.get('lab_id')):
+                return jsonify({'error': 'Group not found or access denied'}), 404
+        
+        result = ComponentGroup.delete(group_id)
+        
+        if result:
+            return jsonify({'message': 'Component group deleted successfully'}), 200
+        else:
+            return jsonify({'error': 'Component group not found'}), 404
+    except Exception as e:
+        return jsonify({'error': f'Error deleting component group: {str(e)}'}), 500
 
 @app.route('/api/component-groups/<group_id>', methods=['GET'])
 @requires_role(['admin', 'trainer'])
@@ -1212,172 +1222,193 @@ def get_component_group(group_id):
 @app.route('/api/labs', methods=['POST'])
 @requires_role(['admin'])
 def create_lab():
-    data = request.get_json()
-    lab_data = {
-        'name': data['name'],
-        'lab_id': data['lab_id'],
-        'location': data['location'],
-        'device_count': data.get('device_count', 0),
-        'status': data.get('status', 'active')
-    }
-    
-    lab_id = Lab.create(lab_data)
-    return jsonify({'message': 'Lab created successfully', 'id': lab_id}), 201
+    try:
+        data = request.get_json()
+        lab_data = {
+            'name': data['name'],
+            'lab_id': data['lab_id'],
+            'location': data['location'],
+            'device_count': data.get('device_count', 0),
+            'status': data.get('status', 'active')
+        }
+        
+        lab_id = Lab.create(lab_data)
+        return jsonify({'message': 'Lab created successfully', 'id': lab_id}), 201
+    except Exception as e:
+        return jsonify({'error': f'Error creating lab: {str(e)}'}), 500
 
 @app.route('/api/labs/<lab_id>', methods=['PUT'])
 @requires_role(['admin'])
 def update_lab(lab_id):
-    data = request.get_json()
-    result = Lab.update(lab_id, data)
-    
-    if result:
-        return jsonify({'message': 'Lab updated successfully'}), 200
-    else:
-        return jsonify({'error': 'Lab not found'}), 404
+    try:
+        data = request.get_json()
+        result = Lab.update(lab_id, data)
+        
+        if result:
+            return jsonify({'message': 'Lab updated successfully'}), 200
+        else:
+            return jsonify({'error': 'Lab not found'}), 404
+    except Exception as e:
+        return jsonify({'error': f'Error updating lab: {str(e)}'}), 500
 
 @app.route('/api/labs/<lab_id>', methods=['DELETE'])
 @requires_role(['admin'])
 def delete_lab(lab_id):
-    result = Lab.delete(lab_id)
-    
-    if result:
-        return jsonify({'message': 'Lab deleted successfully'}), 200
-    else:
-        return jsonify({'error': 'Lab not found'}), 404
+    try:
+        result = Lab.delete(lab_id)
+        
+        if result:
+            return jsonify({'message': 'Lab deleted successfully'}), 200
+        else:
+            return jsonify({'error': 'Lab not found'}), 404
+    except Exception as e:
+        return jsonify({'error': f'Error deleting lab: {str(e)}'}), 500
 
 @app.route('/api/labs/<lab_id>', methods=['GET'])
 @requires_role(['admin'])
 def get_lab(lab_id):
-    lab = Lab.get_by_id(lab_id)
-    if lab:
-        return jsonify(lab)
-    else:
-        return jsonify({'error': 'Lab not found'}), 404
+    try:
+        lab = Lab.get_by_id(lab_id)
+        if lab:
+            return jsonify(lab)
+        else:
+            return jsonify({'error': 'Lab not found'}), 404
+    except Exception as e:
+        return jsonify({'error': f'Error fetching lab: {str(e)}'}), 500
 
 # API Routes for Components (Both Admin and Trainer)
 @app.route('/api/components', methods=['POST'])
 @requires_role(['admin', 'trainer'])
 @requires_trainer_lab_access
 def create_component():
-    data = request.get_json()
-    
-    # For trainers, automatically assign their lab
-    if session.get('role') == 'trainer':
-        lab_id = session.get('lab_id')
-        lab_name = session.get('lab_name')
-        data['lab'] = lab_name
-        data['lab_id'] = lab_id
-        print(f"Trainer creating component for lab: {lab_name}")
-    else:
-        # For admin, get lab details
-        lab = Lab.get_by_name(data['lab'])
-        if not lab:
-            return jsonify({'error': 'Lab not found'}), 404
-        data['lab_id'] = lab['id']
-    
-    # Generate UID for new component
-    existing_components = Component.get_all()
-    uid = generate_component_uid(data['lab_id'], data['name'], existing_components)
-    if not uid:
-        return jsonify({'error': 'Error generating UID for component'}), 500
-    
-    # Handle group assignment
-    group_data = {}
-    if 'group_id' in data and data['group_id']:
-        with get_cursor() as cursor:
-            cursor.execute('SELECT * FROM component_groups WHERE id = %s', (data['group_id'],))
-            group = cursor.fetchone()
+    try:
+        data = request.get_json()
         
-        if group:
-            # For trainers, verify group belongs to their lab
-            if session.get('role') == 'trainer' and group.get('lab_id') and group['lab_id'] != session.get('lab_id'):
-                return jsonify({'error': 'Invalid group selection'}), 400
+        # For trainers, automatically assign their lab
+        if session.get('role') == 'trainer':
+            lab_id = session.get('lab_id')
+            lab_name = session.get('lab_name')
+            data['lab'] = lab_name
+            data['lab_id'] = lab_id
+            print(f"Trainer creating component for lab: {lab_name}")
+        else:
+            # For admin, get lab details
+            lab = Lab.get_by_name(data['lab'])
+            if not lab:
+                return jsonify({'error': 'Lab not found'}), 404
+            data['lab_id'] = lab['id']
+        
+        # Generate UID for new component
+        existing_components = Component.get_all()
+        uid = generate_component_uid(data['lab_id'], data['name'], existing_components)
+        if not uid:
+            return jsonify({'error': 'Error generating UID for component'}), 500
+        
+        # Handle group assignment
+        group_data = {}
+        if 'group_id' in data and data['group_id']:
+            with get_cursor() as cursor:
+                cursor.execute('SELECT * FROM component_groups WHERE id = %s', (data['group_id'],))
+                group = cursor.fetchone()
             
-            group_data = {
-                'group_id': group['id'],
-                'group_name': group['name']
-            }
-    
-    component_data = {
-        'uid': uid,
-        'name': data['name'],
-        'category': data['category'],
-        'lab': data['lab'],
-        'lab_id': data['lab_id'],
-        'initial_quantity': data['initial_quantity'],
-        'current_quantity': data['current_quantity'],
-        'status': 'available' if data['current_quantity'] >= 10 else 'low_stock'
-    }
-    component_data.update(group_data)
-    
-    component_id = Component.create(component_data)
-    return jsonify({'message': 'Component created successfully', 'id': component_id, 'uid': uid}), 201
+            if group:
+                # For trainers, verify group belongs to their lab
+                if session.get('role') == 'trainer' and group.get('lab_id') and group['lab_id'] != session.get('lab_id'):
+                    return jsonify({'error': 'Invalid group selection'}), 400
+                
+                group_data = {
+                    'group_id': group['id'],
+                    'group_name': group['name']
+                }
+        
+        component_data = {
+            'uid': uid,
+            'name': data['name'],
+            'category': data['category'],
+            'lab': data['lab'],
+            'lab_id': data['lab_id'],
+            'initial_quantity': data['initial_quantity'],
+            'current_quantity': data['current_quantity'],
+            'status': 'available' if data['current_quantity'] >= 10 else 'low_stock'
+        }
+        component_data.update(group_data)
+        
+        component_id = Component.create(component_data)
+        return jsonify({'message': 'Component created successfully', 'id': component_id, 'uid': uid}), 201
+    except Exception as e:
+        return jsonify({'error': f'Error creating component: {str(e)}'}), 500
 
 @app.route('/api/components/<component_id>', methods=['PUT'])
 @requires_role(['admin', 'trainer'])
 @requires_trainer_lab_access
 def update_component(component_id):
-    data = request.get_json()
-    
-    # For trainers, verify they own this component
-    if session.get('role') == 'trainer':
-        with get_cursor() as cursor:
-            cursor.execute('SELECT * FROM components WHERE id = %s', (component_id,))
-            component = cursor.fetchone()
-        if not component or component['lab_id'] != session.get('lab_id'):
-            return jsonify({'error': 'Component not found or access denied'}), 404
-    
-    # Update status based on current quantity
-    if 'current_quantity' in data:
-        data['status'] = 'available' if data['current_quantity'] >= 10 else 'low_stock'
-    
-    # Handle group assignment
-    if 'group_id' in data and data['group_id']:
-        with get_cursor() as cursor:
-            cursor.execute('SELECT * FROM component_groups WHERE id = %s', (data['group_id'],))
-            group = cursor.fetchone()
+    try:
+        data = request.get_json()
         
-        if group:
-            # For trainers, verify group belongs to their lab
-            if session.get('role') == 'trainer' and group.get('lab_id') and group['lab_id'] != session.get('lab_id'):
-                return jsonify({'error': 'Invalid group selection'}), 400
+        # For trainers, verify they own this component
+        if session.get('role') == 'trainer':
+            with get_cursor() as cursor:
+                cursor.execute('SELECT * FROM components WHERE id = %s', (component_id,))
+                component = cursor.fetchone()
+            if not component or component['lab_id'] != session.get('lab_id'):
+                return jsonify({'error': 'Component not found or access denied'}), 404
+        
+        # Update status based on current quantity
+        if 'current_quantity' in data:
+            data['status'] = 'available' if data['current_quantity'] >= 10 else 'low_stock'
+        
+        # Handle group assignment
+        if 'group_id' in data and data['group_id']:
+            with get_cursor() as cursor:
+                cursor.execute('SELECT * FROM component_groups WHERE id = %s', (data['group_id'],))
+                group = cursor.fetchone()
             
-            data['group_id'] = group['id']
-            data['group_name'] = group['name']
-        else:
-            # Remove group if not found
+            if group:
+                # For trainers, verify group belongs to their lab
+                if session.get('role') == 'trainer' and group.get('lab_id') and group['lab_id'] != session.get('lab_id'):
+                    return jsonify({'error': 'Invalid group selection'}), 400
+                
+                data['group_id'] = group['id']
+                data['group_name'] = group['name']
+            else:
+                # Remove group if not found
+                data.pop('group_id', None)
+                data.pop('group_name', None)
+        elif 'group_id' in data and not data['group_id']:
+            # Remove group if empty
             data.pop('group_id', None)
             data.pop('group_name', None)
-    elif 'group_id' in data and not data['group_id']:
-        # Remove group if empty
-        data.pop('group_id', None)
-        data.pop('group_name', None)
-    
-    result = Component.update(component_id, data)
-    
-    if result:
-        return jsonify({'message': 'Component updated successfully'}), 200
-    else:
-        return jsonify({'error': 'Component not found'}), 404
+        
+        result = Component.update(component_id, data)
+        
+        if result:
+            return jsonify({'message': 'Component updated successfully'}), 200
+        else:
+            return jsonify({'error': 'Component not found'}), 404
+    except Exception as e:
+        return jsonify({'error': f'Error updating component: {str(e)}'}), 500
 
 @app.route('/api/components/<component_id>', methods=['DELETE'])
 @requires_role(['admin', 'trainer'])
 @requires_trainer_lab_access
 def delete_component(component_id):
-    # For trainers, verify they own this component
-    if session.get('role') == 'trainer':
-        with get_cursor() as cursor:
-            cursor.execute('SELECT * FROM components WHERE id = %s', (component_id,))
-            component = cursor.fetchone()
-        if not component or component['lab_id'] != session.get('lab_id'):
-            return jsonify({'error': 'Component not found or access denied'}), 404
-    
-    result = Component.delete(component_id)
-    
-    if result:
-        return jsonify({'message': 'Component deleted successfully'}), 200
-    else:
-        return jsonify({'error': 'Component not found'}), 404
+    try:
+        # For trainers, verify they own this component
+        if session.get('role') == 'trainer':
+            with get_cursor() as cursor:
+                cursor.execute('SELECT * FROM components WHERE id = %s', (component_id,))
+                component = cursor.fetchone()
+            if not component or component['lab_id'] != session.get('lab_id'):
+                return jsonify({'error': 'Component not found or access denied'}), 404
+        
+        result = Component.delete(component_id)
+        
+        if result:
+            return jsonify({'message': 'Component deleted successfully'}), 200
+        else:
+            return jsonify({'error': 'Component not found'}), 404
+    except Exception as e:
+        return jsonify({'error': f'Error deleting component: {str(e)}'}), 500
 
 @app.route('/api/components/<component_id>', methods=['GET'])
 @requires_role(['admin', 'trainer'])
@@ -1403,246 +1434,255 @@ def get_component(component_id):
 @requires_role(['admin', 'trainer'])
 @requires_trainer_lab_access
 def create_transaction():
-    data = request.get_json()
-    transaction_type = data.get('type', 'issue')
-    
-    # For trainers, automatically assign their lab
-    if session.get('role') == 'trainer':
-        lab_id = session.get('lab_id')
-        lab_name = session.get('lab_name')
-        data['lab'] = lab_name
-        data['lab_id'] = lab_id
-        print(f"Trainer creating transaction for lab: {lab_name}")
-    
-    # Get lab information for admin
-    if session.get('role') == 'admin':
-        lab = Lab.get_by_name(data['lab'])
-        if not lab:
-            return jsonify({'error': 'Lab not found'}), 404
-        data['lab_id'] = lab['id']
-    
-    # Get component details including UID
-    with get_cursor() as cursor:
-        cursor.execute('SELECT * FROM components WHERE name = %s AND lab = %s', (data['component_name'], data['lab']))
-        component = cursor.fetchone()
-    
-    if not component:
-        return jsonify({'error': 'Component not found'}), 404
-    
-    # For trainers, verify they own this component
-    if session.get('role') == 'trainer' and component['lab_id'] != session.get('lab_id'):
-        return jsonify({'error': 'Component not found or access denied'}), 404
-    
-    if transaction_type == 'issue':
-        if component['current_quantity'] < data['quantity_issued']:
-            return jsonify({'error': 'Insufficient quantity available'}), 400
+    try:
+        data = request.get_json()
+        transaction_type = data.get('type', 'issue')
         
-        # Reduce component quantity
-        new_quantity = component['current_quantity'] - data['quantity_issued']
-        Component.update(component['id'], {
-            'current_quantity': new_quantity,
-            'status': 'available' if new_quantity >= 10 else 'low_stock'
-        })
+        # For trainers, automatically assign their lab
+        if session.get('role') == 'trainer':
+            lab_id = session.get('lab_id')
+            lab_name = session.get('lab_name')
+            data['lab'] = lab_name
+            data['lab_id'] = lab_id
+            print(f"Trainer creating transaction for lab: {lab_name}")
         
-        transaction_data = {
-            'component_name': data['component_name'],
-            'component_uid': component.get('uid', 'N/A'),
-            'lab': data['lab'],
-            'lab_id': data['lab_id'],
-            'issued_to': data['issued_to'],
-            'campus': data.get('campus', ''),
-            'quantity_issued': data['quantity_issued'],
-            'quantity_returned': 0,
-            'pending_quantity': data['quantity_issued'],  # New field: initially all are pending
-            'status': 'issued',
-            'issue_date': datetime.utcnow(),
-            'purpose': data.get('purpose', '')
-        }
+        # Get lab information for admin
+        if session.get('role') == 'admin':
+            lab = Lab.get_by_name(data['lab'])
+            if not lab:
+                return jsonify({'error': 'Lab not found'}), 404
+            data['lab_id'] = lab['id']
         
-        transaction_id = Transaction.create(transaction_data)
-        return jsonify({'message': 'Transaction created successfully', 'id': transaction_id}), 201
-        
-    else:  # return transaction
-        # For return transactions, find active issued transactions for this component and recipient
+        # Get component details including UID
         with get_cursor() as cursor:
-            cursor.execute('''
-                SELECT * FROM transactions 
-                WHERE component_name = %s AND lab_id = %s AND issued_to = %s AND pending_quantity > 0 
-                ORDER BY issue_date ASC
-            ''', (data['component_name'], data['lab_id'], data['issued_to']))
-            issued_transactions = cursor.fetchall()
+            cursor.execute('SELECT * FROM components WHERE name = %s AND lab = %s', (data['component_name'], data['lab']))
+            component = cursor.fetchone()
         
-        if not issued_transactions:
-            return jsonify({'error': 'No active issued transactions found for return'}), 400
+        if not component:
+            return jsonify({'error': 'Component not found'}), 404
+        
+        # For trainers, verify they own this component
+        if session.get('role') == 'trainer' and component['lab_id'] != session.get('lab_id'):
+            return jsonify({'error': 'Component not found or access denied'}), 404
+        
+        if transaction_type == 'issue':
+            if component['current_quantity'] < data['quantity_issued']:
+                return jsonify({'error': 'Insufficient quantity available'}), 400
             
-        # Use the oldest issued transaction for return
-        issued_transaction = issued_transactions[0]
-        
-        if data['quantity_returned'] > issued_transaction['pending_quantity']:
-            return jsonify({'error': f'Cannot return more than pending quantity ({issued_transaction["pending_quantity"]})'}), 400
-        
-        # Calculate new pending quantity
-        new_pending_quantity = issued_transaction['pending_quantity'] - data['quantity_returned']
-        new_quantity_returned = issued_transaction['quantity_returned'] + data['quantity_returned']
-        
-        # Update the original transaction
-        new_status = 'returned' if new_pending_quantity == 0 else 'partially_returned'
-        
-        update_data = {
-            'quantity_returned': new_quantity_returned,
-            'pending_quantity': new_pending_quantity,
-            'status': new_status
-        }
-        
-        if new_status == 'returned':
-            update_data['return_date'] = datetime.utcnow()
-        
-        Transaction.update(issued_transaction['id'], update_data)
-        
-        # Increase component quantity by the returned amount
-        new_component_quantity = component['current_quantity'] + data['quantity_returned']
-        if new_component_quantity > component['initial_quantity']:
-            return jsonify({'error': 'Returned quantity would exceed initial stock'}), 400
+            # Reduce component quantity
+            new_quantity = component['current_quantity'] - data['quantity_issued']
+            Component.update(component['id'], {
+                'current_quantity': new_quantity,
+                'status': 'available' if new_quantity >= 10 else 'low_stock'
+            })
             
-        Component.update(component['id'], {
-            'current_quantity': new_component_quantity,
-            'status': 'available' if new_component_quantity >= 10 else 'low_stock'
-        })
-        
-        return jsonify({'message': 'Component returned successfully'}), 200
+            transaction_data = {
+                'component_name': data['component_name'],
+                'component_uid': component.get('uid', 'N/A'),
+                'lab': data['lab'],
+                'lab_id': data['lab_id'],
+                'issued_to': data['issued_to'],
+                'campus': data.get('campus', ''),
+                'quantity_issued': data['quantity_issued'],
+                'quantity_returned': 0,
+                'pending_quantity': data['quantity_issued'],  # New field: initially all are pending
+                'status': 'issued',
+                'issue_date': datetime.utcnow(),
+                'purpose': data.get('purpose', '')
+            }
+            
+            transaction_id = Transaction.create(transaction_data)
+            return jsonify({'message': 'Transaction created successfully', 'id': transaction_id}), 201
+            
+        else:  # return transaction
+            # For return transactions, find active issued transactions for this component and recipient
+            with get_cursor() as cursor:
+                cursor.execute('''
+                    SELECT * FROM transactions 
+                    WHERE component_name = %s AND lab_id = %s AND issued_to = %s AND pending_quantity > 0 
+                    ORDER BY issue_date ASC
+                ''', (data['component_name'], data['lab_id'], data['issued_to']))
+                issued_transactions = cursor.fetchall()
+            
+            if not issued_transactions:
+                return jsonify({'error': 'No active issued transactions found for return'}), 400
+                
+            # Use the oldest issued transaction for return
+            issued_transaction = issued_transactions[0]
+            
+            if data['quantity_returned'] > issued_transaction['pending_quantity']:
+                return jsonify({'error': f'Cannot return more than pending quantity ({issued_transaction["pending_quantity"]})'}), 400
+            
+            # Calculate new pending quantity
+            new_pending_quantity = issued_transaction['pending_quantity'] - data['quantity_returned']
+            new_quantity_returned = issued_transaction['quantity_returned'] + data['quantity_returned']
+            
+            # Update the original transaction
+            new_status = 'returned' if new_pending_quantity == 0 else 'partially_returned'
+            
+            update_data = {
+                'quantity_returned': new_quantity_returned,
+                'pending_quantity': new_pending_quantity,
+                'status': new_status
+            }
+            
+            if new_status == 'returned':
+                update_data['return_date'] = datetime.utcnow()
+            
+            Transaction.update(issued_transaction['id'], update_data)
+            
+            # Increase component quantity by the returned amount
+            new_component_quantity = component['current_quantity'] + data['quantity_returned']
+            if new_component_quantity > component['initial_quantity']:
+                return jsonify({'error': 'Returned quantity would exceed initial stock'}), 400
+                
+            Component.update(component['id'], {
+                'current_quantity': new_component_quantity,
+                'status': 'available' if new_component_quantity >= 10 else 'low_stock'
+            })
+            
+            return jsonify({'message': 'Component returned successfully'}), 200
+    except Exception as e:
+        return jsonify({'error': f'Error creating transaction: {str(e)}'}), 500
 
 @app.route('/api/transactions/<transaction_id>', methods=['PUT'])
 @requires_role(['admin', 'trainer'])
 @requires_trainer_lab_access
 def update_transaction(transaction_id):
-    data = request.get_json()
-    
-    # For trainers, verify they own this transaction
-    if session.get('role') == 'trainer':
+    try:
+        data = request.get_json()
+        
+        # For trainers, verify they own this transaction
+        if session.get('role') == 'trainer':
+            with get_cursor() as cursor:
+                cursor.execute('SELECT * FROM transactions WHERE id = %s', (transaction_id,))
+                transaction = cursor.fetchone()
+            if not transaction or transaction['lab_id'] != session.get('lab_id'):
+                return jsonify({'error': 'Transaction not found or access denied'}), 404
+        
+        # Get the original transaction before update
         with get_cursor() as cursor:
             cursor.execute('SELECT * FROM transactions WHERE id = %s', (transaction_id,))
-            transaction = cursor.fetchone()
-        if not transaction or transaction['lab_id'] != session.get('lab_id'):
-            return jsonify({'error': 'Transaction not found or access denied'}), 404
-    
-    # Get the original transaction before update
-    with get_cursor() as cursor:
-        cursor.execute('SELECT * FROM transactions WHERE id = %s', (transaction_id,))
-        original_transaction = cursor.fetchone()
-    
-    if not original_transaction:
-        return jsonify({'error': 'Transaction not found'}), 404
-    
-    # Get the component associated with this transaction
-    with get_cursor() as cursor:
-        cursor.execute('SELECT * FROM components WHERE name = %s AND lab_id = %s', 
-                      (original_transaction['component_name'], original_transaction['lab_id']))
-        component = cursor.fetchone()
-    
-    if not component:
-        return jsonify({'error': 'Component not found'}), 404
-    
-    # Handle quantity_returned changes
-    if 'quantity_returned' in data:
-        new_returned = data.get('quantity_returned', 0)
-        old_returned = original_transaction.get('quantity_returned', 0)
-        returned_delta = new_returned - old_returned
+            original_transaction = cursor.fetchone()
         
-        # Validate the new returned quantity
-        if new_returned < 0:
-            return jsonify({'error': 'Returned quantity cannot be negative'}), 400
-            
-        if new_returned > original_transaction['quantity_issued']:
-            return jsonify({'error': 'Returned quantity cannot exceed issued quantity'}), 400
+        if not original_transaction:
+            return jsonify({'error': 'Transaction not found'}), 404
         
-        # Calculate new pending quantity
-        new_pending_quantity = original_transaction['quantity_issued'] - new_returned
+        # Get the component associated with this transaction
+        with get_cursor() as cursor:
+            cursor.execute('SELECT * FROM components WHERE name = %s AND lab_id = %s', 
+                          (original_transaction['component_name'], original_transaction['lab_id']))
+            component = cursor.fetchone()
         
-        # Update the component quantity based on the delta
-        if returned_delta != 0:
-            new_component_quantity = component['current_quantity'] + returned_delta
-            
-            # Validate that new quantity doesn't exceed initial quantity
-            if new_component_quantity > component['initial_quantity']:
-                return jsonify({
-                    'error': f'Cannot return more than initial quantity. Component "{component["name"]}" has initial quantity of {component["initial_quantity"]}'
-                }), 400
-            
-            # Validate that quantity doesn't go negative
-            if new_component_quantity < 0:
-                return jsonify({
-                    'error': f'Insufficient quantity available. Component "{component["name"]}" would have negative quantity'
-                }), 400
-            
-            # Update component quantity and status
-            component_update_data = {
-                'current_quantity': new_component_quantity,
-                'status': 'available' if new_component_quantity >= 10 else 'low_stock'
-            }
-            if new_component_quantity == 0:
-                component_update_data['status'] = 'out_of_stock'
-            
-            Component.update(component['id'], component_update_data)
+        if not component:
+            return jsonify({'error': 'Component not found'}), 404
         
-        # Update transaction data
-        data['pending_quantity'] = new_pending_quantity
+        # Handle quantity_returned changes
+        if 'quantity_returned' in data:
+            new_returned = data.get('quantity_returned', 0)
+            old_returned = original_transaction.get('quantity_returned', 0)
+            returned_delta = new_returned - old_returned
+            
+            # Validate the new returned quantity
+            if new_returned < 0:
+                return jsonify({'error': 'Returned quantity cannot be negative'}), 400
+                
+            if new_returned > original_transaction['quantity_issued']:
+                return jsonify({'error': 'Returned quantity cannot exceed issued quantity'}), 400
+            
+            # Calculate new pending quantity
+            new_pending_quantity = original_transaction['quantity_issued'] - new_returned
+            
+            # Update the component quantity based on the delta
+            if returned_delta != 0:
+                new_component_quantity = component['current_quantity'] + returned_delta
+                
+                # Validate that new quantity doesn't exceed initial quantity
+                if new_component_quantity > component['initial_quantity']:
+                    return jsonify({
+                        'error': f'Cannot return more than initial quantity. Component "{component["name"]}" has initial quantity of {component["initial_quantity"]}'
+                    }), 400
+                
+                # Validate that quantity doesn't go negative
+                if new_component_quantity < 0:
+                    return jsonify({
+                        'error': f'Insufficient quantity available. Component "{component["name"]}" would have negative quantity'
+                    }), 400
+                
+                # Update component quantity and status
+                component_update_data = {
+                    'current_quantity': new_component_quantity,
+                    'status': 'available' if new_component_quantity >= 10 else 'low_stock'
+                }
+                if new_component_quantity == 0:
+                    component_update_data['status'] = 'out_of_stock'
+                
+                Component.update(component['id'], component_update_data)
+            
+            # Update transaction data
+            data['pending_quantity'] = new_pending_quantity
+            
+            # Update status based on returned quantity
+            if new_returned == 0:
+                data['status'] = 'issued'
+            elif new_returned == original_transaction['quantity_issued']:
+                data['status'] = 'returned'
+                if not original_transaction.get('return_date'):
+                    data['return_date'] = datetime.utcnow()
+            else:
+                data['status'] = 'partially_returned'
+                # Don't set return date for partial returns
         
-        # Update status based on returned quantity
-        if new_returned == 0:
-            data['status'] = 'issued'
-        elif new_returned == original_transaction['quantity_issued']:
-            data['status'] = 'returned'
-            if not original_transaction.get('return_date'):
-                data['return_date'] = datetime.utcnow()
+        # Update the transaction
+        result = Transaction.update(transaction_id, data)
+        
+        if result:
+            return jsonify({'message': 'Transaction updated successfully'}), 200
         else:
-            data['status'] = 'partially_returned'
-            # Don't set return date for partial returns
-    
-    # Update the transaction
-    result = Transaction.update(transaction_id, data)
-    
-    if result:
-        return jsonify({'message': 'Transaction updated successfully'}), 200
-    else:
-        return jsonify({'error': 'Transaction not found or no changes made'}), 404
+            return jsonify({'error': 'Transaction not found or no changes made'}), 404
+    except Exception as e:
+        return jsonify({'error': f'Error updating transaction: {str(e)}'}), 500
 
 @app.route('/api/transactions/<transaction_id>', methods=['DELETE'])
 @requires_role(['admin', 'trainer'])
 @requires_trainer_lab_access
 def delete_transaction(transaction_id):
-    # For trainers, verify they own this transaction
-    if session.get('role') == 'trainer':
+    try:
+        # For trainers, verify they own this transaction
+        if session.get('role') == 'trainer':
+            with get_cursor() as cursor:
+                cursor.execute('SELECT * FROM transactions WHERE id = %s', (transaction_id,))
+                transaction = cursor.fetchone()
+            if not transaction or transaction['lab_id'] != session.get('lab_id'):
+                return jsonify({'error': 'Transaction not found or access denied'}), 404
+        
+        # Get the transaction before deletion to restore component quantity if needed
         with get_cursor() as cursor:
             cursor.execute('SELECT * FROM transactions WHERE id = %s', (transaction_id,))
             transaction = cursor.fetchone()
-        if not transaction or transaction['lab_id'] != session.get('lab_id'):
-            return jsonify({'error': 'Transaction not found or access denied'}), 404
-    
-    # Get the transaction before deletion to restore component quantity if needed
-    with get_cursor() as cursor:
-        cursor.execute('SELECT * FROM transactions WHERE id = %s', (transaction_id,))
-        transaction = cursor.fetchone()
-    
-    if transaction and transaction.get('pending_quantity', 0) > 0:
-        # Restore the pending quantity back to component
-        with get_cursor() as cursor:
-            cursor.execute('SELECT * FROM components WHERE name = %s AND lab_id = %s', 
-                          (transaction['component_name'], transaction['lab_id']))
-            component = cursor.fetchone()
         
-        if component:
-            new_quantity = component['current_quantity'] + transaction['pending_quantity']
-            Component.update(component['id'], {
-                'current_quantity': new_quantity,
-                'status': 'available' if new_quantity >= 10 else 'low_stock'
-            })
-    
-    result = Transaction.delete(transaction_id)
-    
-    if result:
-        return jsonify({'message': 'Transaction deleted successfully'}), 200
-    else:
-        return jsonify({'error': 'Transaction not found'}), 404
+        if transaction and transaction.get('pending_quantity', 0) > 0:
+            # Restore the pending quantity back to component
+            with get_cursor() as cursor:
+                cursor.execute('SELECT * FROM components WHERE name = %s AND lab_id = %s', 
+                              (transaction['component_name'], transaction['lab_id']))
+                component = cursor.fetchone()
+            
+            if component:
+                new_quantity = component['current_quantity'] + transaction['pending_quantity']
+                Component.update(component['id'], {
+                    'current_quantity': new_quantity,
+                    'status': 'available' if new_quantity >= 10 else 'low_stock'
+                })
+        
+        result = Transaction.delete(transaction_id)
+        
+        if result:
+            return jsonify({'message': 'Transaction deleted successfully'}), 200
+        else:
+            return jsonify({'error': 'Transaction not found'}), 404
+    except Exception as e:
+        return jsonify({'error': f'Error deleting transaction: {str(e)}'}), 500
 
 @app.route('/api/transactions/<transaction_id>', methods=['GET'])
 @requires_role(['admin', 'trainer'])
@@ -1700,87 +1740,90 @@ def get_components_by_lab(lab_name):
 @app.route('/api/dashboard/stats')
 @requires_role(['admin', 'trainer'])
 def get_dashboard_stats():
-    if session.get('role') == 'admin':
-        # Admin dashboard stats
-        with get_cursor() as cursor:
-            cursor.execute('SELECT COUNT(*) as count FROM labs')
-            total_labs = cursor.fetchone()['count']
+    try:
+        if session.get('role') == 'admin':
+            # Admin dashboard stats
+            with get_cursor() as cursor:
+                cursor.execute('SELECT COUNT(*) as count FROM labs')
+                total_labs = cursor.fetchone()['count']
+                
+                cursor.execute('SELECT COUNT(*) as count FROM components')
+                total_components = cursor.fetchone()['count']
+                
+                cursor.execute('SELECT COUNT(*) as count FROM users WHERE role = "trainer"')
+                total_trainers = cursor.fetchone()['count']
+                
+                # Today's transactions
+                today_start = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+                cursor.execute('SELECT COUNT(*) as count FROM transactions WHERE issue_date >= %s', (today_start,))
+                issued_today = cursor.fetchone()['count']
+                
+                # Low stock components
+                cursor.execute('SELECT COUNT(*) as count FROM components WHERE current_quantity < 10')
+                low_stock = cursor.fetchone()['count']
+                
+                # Overdue items
+                overdue_threshold = datetime.utcnow() - timedelta(days=14)
+                cursor.execute('SELECT COUNT(*) as count FROM transactions WHERE issue_date < %s AND pending_quantity > 0', 
+                              (overdue_threshold,))
+                overdue_count = cursor.fetchone()['count']
+                
+                # Pending returns
+                cursor.execute('SELECT COUNT(*) as count FROM transactions WHERE pending_quantity > 0')
+                pending_returns = cursor.fetchone()['count']
             
-            cursor.execute('SELECT COUNT(*) as count FROM components')
-            total_components = cursor.fetchone()['count']
-            
-            cursor.execute('SELECT COUNT(*) as count FROM users WHERE role = "trainer"')
-            total_trainers = cursor.fetchone()['count']
-            
-            # Today's transactions
-            today_start = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
-            cursor.execute('SELECT COUNT(*) as count FROM transactions WHERE issue_date >= %s', (today_start,))
-            issued_today = cursor.fetchone()['count']
-            
-            # Low stock components
-            cursor.execute('SELECT COUNT(*) as count FROM components WHERE current_quantity < 10')
-            low_stock = cursor.fetchone()['count']
-            
-            # Overdue items
-            overdue_threshold = datetime.utcnow() - timedelta(days=14)
-            cursor.execute('SELECT COUNT(*) as count FROM transactions WHERE issue_date < %s AND pending_quantity > 0', 
-                          (overdue_threshold,))
-            overdue_count = cursor.fetchone()['count']
-            
-            # Pending returns
-            cursor.execute('SELECT COUNT(*) as count FROM transactions WHERE pending_quantity > 0')
-            pending_returns = cursor.fetchone()['count']
+            return jsonify({
+                'total_labs': total_labs,
+                'total_components': total_components,
+                'total_trainers': total_trainers,
+                'issued_today': issued_today,
+                'low_stock': low_stock,
+                'overdue_count': overdue_count,
+                'pending_returns': pending_returns
+            })
         
-        return jsonify({
-            'total_labs': total_labs,
-            'total_components': total_components,
-            'total_trainers': total_trainers,
-            'issued_today': issued_today,
-            'low_stock': low_stock,
-            'overdue_count': overdue_count,
-            'pending_returns': pending_returns
-        })
-    
-    else:  # Trainer
-        lab_id = session.get('lab_id')
-        lab_name = session.get('lab_name')
-        
-        if not lab_id:
-            return jsonify({'error': 'No lab assigned'}), 400
-        
-        # Trainer dashboard stats
-        with get_cursor() as cursor:
-            cursor.execute('SELECT COUNT(*) as count FROM components WHERE lab_id = %s', (lab_id,))
-            total_components = cursor.fetchone()['count']
+        else:  # Trainer
+            lab_id = session.get('lab_id')
+            lab_name = session.get('lab_name')
             
-            # Low stock components for trainer's lab
-            cursor.execute('SELECT COUNT(*) as count FROM components WHERE lab_id = %s AND current_quantity < 10', (lab_id,))
-            low_stock = cursor.fetchone()['count']
+            if not lab_id:
+                return jsonify({'error': 'No lab assigned'}), 400
             
-            # Today's transactions for trainer's lab
-            today_start = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
-            cursor.execute('SELECT COUNT(*) as count FROM transactions WHERE lab_id = %s AND issue_date >= %s', 
-                          (lab_id, today_start))
-            issued_today = cursor.fetchone()['count']
+            # Trainer dashboard stats
+            with get_cursor() as cursor:
+                cursor.execute('SELECT COUNT(*) as count FROM components WHERE lab_id = %s', (lab_id,))
+                total_components = cursor.fetchone()['count']
+                
+                # Low stock components for trainer's lab
+                cursor.execute('SELECT COUNT(*) as count FROM components WHERE lab_id = %s AND current_quantity < 10', (lab_id,))
+                low_stock = cursor.fetchone()['count']
+                
+                # Today's transactions for trainer's lab
+                today_start = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+                cursor.execute('SELECT COUNT(*) as count FROM transactions WHERE lab_id = %s AND issue_date >= %s', 
+                              (lab_id, today_start))
+                issued_today = cursor.fetchone()['count']
+                
+                # Overdue items for trainer's lab
+                overdue_threshold = datetime.utcnow() - timedelta(days=14)
+                cursor.execute('SELECT COUNT(*) as count FROM transactions WHERE lab_id = %s AND issue_date < %s AND pending_quantity > 0', 
+                              (lab_id, overdue_threshold))
+                overdue_count = cursor.fetchone()['count']
+                
+                # Pending returns for trainer's lab
+                cursor.execute('SELECT COUNT(*) as count FROM transactions WHERE lab_id = %s AND pending_quantity > 0', (lab_id,))
+                pending_returns = cursor.fetchone()['count']
             
-            # Overdue items for trainer's lab
-            overdue_threshold = datetime.utcnow() - timedelta(days=14)
-            cursor.execute('SELECT COUNT(*) as count FROM transactions WHERE lab_id = %s AND issue_date < %s AND pending_quantity > 0', 
-                          (lab_id, overdue_threshold))
-            overdue_count = cursor.fetchone()['count']
-            
-            # Pending returns for trainer's lab
-            cursor.execute('SELECT COUNT(*) as count FROM transactions WHERE lab_id = %s AND pending_quantity > 0', (lab_id,))
-            pending_returns = cursor.fetchone()['count']
-        
-        return jsonify({
-            'lab_name': lab_name,
-            'total_components': total_components,
-            'issued_today': issued_today,
-            'low_stock': low_stock,
-            'overdue_count': overdue_count,
-            'pending_returns': pending_returns
-        })
+            return jsonify({
+                'lab_name': lab_name,
+                'total_components': total_components,
+                'issued_today': issued_today,
+                'low_stock': low_stock,
+                'overdue_count': overdue_count,
+                'pending_returns': pending_returns
+            })
+    except Exception as e:
+        return jsonify({'error': f'Error fetching dashboard stats: {str(e)}'}), 500
 
 # Error handlers
 @app.errorhandler(404)
@@ -1794,4 +1837,9 @@ def internal_error(error):
 if __name__ == '__main__':
     with app.app_context():
         init_sample_data()
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    
+    # Use different settings for PythonAnywhere
+    if os.environ.get('PYTHONANYWHERE_SITE'):
+        app.run(debug=False, host='0.0.0.0')
+    else:
+        app.run(debug=True, host='0.0.0.0', port=5000)
