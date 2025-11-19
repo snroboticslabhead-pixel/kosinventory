@@ -4,14 +4,20 @@ import contextlib
 
 def get_db_connection():
     """Get MySQL database connection"""
-    return pymysql.connect(
-        host=current_app.config['MYSQL_HOST'],
-        user=current_app.config['MYSQL_USER'],
-        password=current_app.config['MYSQL_PASSWORD'],
-        database=current_app.config['MYSQL_DB'],
-        charset='utf8mb4',
-        cursorclass=pymysql.cursors.DictCursor
-    )
+    try:
+        conn = pymysql.connect(
+            host=current_app.config['MYSQL_HOST'],
+            user=current_app.config['MYSQL_USER'],
+            password=current_app.config['MYSQL_PASSWORD'],
+            database=current_app.config['MYSQL_DB'],
+            charset='utf8mb4',
+            cursorclass=pymysql.cursors.DictCursor,
+            autocommit=False
+        )
+        return conn
+    except Exception as e:
+        print(f"Database connection error: {str(e)}")
+        raise
 
 @contextlib.contextmanager
 def get_cursor():
@@ -23,6 +29,7 @@ def get_cursor():
         conn.commit()
     except Exception as e:
         conn.rollback()
+        print(f"Database error: {str(e)}")
         raise e
     finally:
         cursor.close()
@@ -87,8 +94,8 @@ def init_db():
                 current_quantity INT NOT NULL,
                 status ENUM('available', 'low_stock', 'out_of_stock') DEFAULT 'available',
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (lab_id) REFERENCES labs(id),
-                FOREIGN KEY (group_id) REFERENCES component_groups(id)
+                FOREIGN KEY (lab_id) REFERENCES labs(id) ON DELETE CASCADE,
+                FOREIGN KEY (group_id) REFERENCES component_groups(id) ON DELETE SET NULL
             )
         ''')
         
@@ -110,6 +117,8 @@ def init_db():
                 return_date TIMESTAMP NULL,
                 purpose TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (lab_id) REFERENCES labs(id)
+                FOREIGN KEY (lab_id) REFERENCES labs(id) ON DELETE CASCADE
             )
         ''')
+        
+        print("Database tables initialized successfully")
